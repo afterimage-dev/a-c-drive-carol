@@ -32,6 +32,7 @@ Press **Esc** at any moment and the haunting ends instantly, with nothing change
 | The Ghost of Downloads Past | Old downloads and leftover installers | Cormorant Garamond, light italic; words surface like memories |
 | The Ghost of Filesystems Present | Duplicate files | Abril Fatface; loud, and shadowed by a copy of himself |
 | The Spirit of Disk Space Yet to Come | Your drive's future | Never speaks. The gravestone does, in Cinzel |
+| You | Your thoughts and replies | Old Standard TT italic, the type of a Victorian printed page; your words rise in, and stutter when you're afraid |
 | Your files | Themselves | JetBrains Mono. Spirits speak in serif; files speak in code |
 
 Every line is written from what your files actually are: the site they came from, how long they've waited, the exact minute they arrived. *"You fetched me at 2:14 in the morning, on a Tuesday. Do you remember why you were awake?"*
@@ -112,7 +113,7 @@ node core/manifest.js my-manifest.json
 ## Credits
 
 - **Charles Dickens**, *A Christmas Carol* (1843), which is in the public domain. Lines borrowed from it are used lovingly and sparingly.
-- **Typefaces**, all under the SIL Open Font License: IM Fell English (Igino Marini), Cormorant Garamond, Abril Fatface, Cinzel, JetBrains Mono and Atkinson Hyperlegible.
+- **Typefaces**, all under the SIL Open Font License: IM Fell English (Igino Marini), Cormorant Garamond, Abril Fatface, Cinzel, Old Standard TT (Alexey Kryukov), JetBrains Mono, IBM Plex Mono and Atkinson Hyperlegible.
 - **Animation**: [PixiJS](https://pixijs.com) (MIT).
 - **Character art**: generated with an AI image model, then cut out and animated in code.
 
