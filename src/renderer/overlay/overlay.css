@@ -31,6 +31,10 @@ body.visit #stage canvas { cursor: default; }
 .card.v-you { font-family: var(--body); font-style: italic; font-size: var(--you-size); line-height: 1.24; color: #f6f3fd; max-width: min(62vw, 1100px);
   background: rgba(6, 6, 11, .56); border: 0; border-radius: 18px; padding: 14px 26px 18px; box-shadow: 0 0 46px 26px rgba(6, 6, 11, .5);
   backdrop-filter: blur(5px); text-shadow: var(--you-shadow); transition: opacity .7s; }
+/* your words rise in: a small lift and a blur clearing, quickly */
+.card.v-you .w { opacity: 0; transform: translateY(.22em); filter: blur(3px); transition: opacity .3s ease, transform .4s cubic-bezier(.2, .8, .2, 1), filter .3s ease; }
+.card.v-you .w.in { opacity: 1; transform: none; filter: none; }
+.card.v-you.afraid .w { transition-duration: .45s, .55s, .45s; }
 /* afraid: every letter trembles */
 .card.v-you.afraid .l { display: inline-block; animation: tremble .18s steps(2) infinite; }
 @keyframes tremble { 0% { transform: translate(0, 0); } 25% { transform: translate(.6px, -.8px) rotate(.6deg); } 50% { transform: translate(-.8px, .5px); } 75% { transform: translate(.5px, .9px) rotate(-.5deg); } 100% { transform: translate(-.4px, -.4px); } }
@@ -142,4 +146,5 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
   .v-past .w, .v-present .w { transition: none; filter: none; transform: none; }
   .shake { animation: none; }
   .card.v-you.afraid .l { animation: none; }
+  .card.v-you .w { transition: none; filter: none; transform: none; }
 }

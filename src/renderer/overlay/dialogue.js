@@ -1,5 +1,7 @@
 // Speech cards. Each speaker has its own typeface and its own way of arriving: Marlware types with glitching letters,
-// the Past's words surface like memories, the Present's pop and shake, your thoughts fade in, files type in code.
+// the Past's words surface like memories, the Present's pop and shake, files type in code. Your own lines rise in
+// quickly, word by word, faster than any spirit's, since they're already in your head; when you're afraid they come
+// haltingly, with uneven gaps, and every letter trembles.
 // A tap (or Space) completes a line; the next tap moves on. Lines also move on by themselves.
 
 import { clamp, el, esc, until, wait } from "./util.js";
@@ -9,7 +11,7 @@ const VOICES = {
   marl: { who: "Jacob Marlware", mode: "type", cps: 24 },
   past: { who: "The Ghost of Downloads Past", mode: "words", wps: 3.2 },
   present: { who: "The Ghost of Filesystems Present", mode: "words", wps: 4.6 },
-  you: { who: "", mode: "fade", quote: true, at: "lowerLeft" },   // your own lines: large, in quotes, from where you sit
+  you: { who: "", mode: "rise", quote: true, at: "lowerLeft" },   // your own lines: large, in quotes, from where you sit
   narrator: { who: "", mode: "fade" },
   tiny: { who: "Tiny.tmp", mode: "type", cps: 16, plain: true }
 };
@@ -48,12 +50,24 @@ export class Dialogue {
         : `<span class="txt"><span class="typed"></span><span class="rest">${esc(text)}</span></span>`);   // the untyped rest keeps the card its final size
     const txt = card.querySelector(v.mode === "type" ? ".typed" : ".txt");
     const rest = card.querySelector(".rest");
-    if (v.mode === "fade") {
+    if (v.mode === "fade") { rest.textContent = ""; txt.textContent = text; }
+    let risen = null, times = null;
+    if (v.mode === "rise") {
+      // each word in its own span (and, when afraid, each letter, so it can tremble)
+      let li = 0;
       rest.textContent = "";
-      if (afraid) txt.innerHTML = [...text].map((ch, i) => (ch === " " ? " " : `<span class="l" style="animation-delay:-${(i * 0.037) % 0.18}s">${esc(ch)}</span>`)).join("");
-      else txt.textContent = text;
+      txt.innerHTML = text.split(/(\s+)/).filter(Boolean).map((part) => (/^\s+$/.test(part) ? part
+        : `<span class="w">${afraid ? [...part].map((ch) => `<span class="l" style="animation-delay:-${(li++ * 0.037) % 0.18}s">${esc(ch)}</span>`).join("") : esc(part)}</span>`)).join("");
+      risen = [...txt.querySelectorAll(".w")];
+      // when each word arrives (ms): a steady 40 ms apart, or halting when afraid, catching breath at commas
+      let at = 0;
+      times = risen.map((w) => {
+        const now = at;
+        at += afraid ? 90 + Math.random() * 170 + (/[,;:\u2014]\W*$/.test(w.textContent) ? 380 : 0) + (Math.random() < 0.15 ? 320 : 0) : 40;
+        return now;
+      });
     }
-    this.line = { text, v, voice, puppet, at: at || v.at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: words ? [...txt.querySelectorAll(".w")] : null, resolve: null };
+    this.line = { text, v, voice, puppet, at: at || v.at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: risen || (words ? [...txt.querySelectorAll(".w")] : null), times, elapsed: 0, resolve: null };
     requestAnimationFrame(() => card.classList.add("on"));
     this.place();
     try {
@@ -156,6 +170,10 @@ export class Dialogue {
         L.rest.textContent = L.text.slice(n + (glitch ? 1 : 0));
         open = /[aeiou]/i.test(ch) ? 1 : /[\s.,?;:!]/.test(ch) ? 0 : 0.55;
         if (n >= L.text.length) this.finish();
+      } else if (L.v.mode === "rise") {
+        L.elapsed += dt * 1000;
+        while (L.n < L.words.length && L.times[L.n] <= L.elapsed) L.words[L.n++].classList.add("in");
+        if (L.n >= L.words.length) this.finish();
       } else if (L.v.mode === "words") {
         const before = Math.floor(L.n);
         L.n += dt * L.v.wps * 2;   // the list includes the spaces between words
