@@ -18,7 +18,7 @@ export function iconHtml(ctx, f) {
 
 /** A stave's title card, in the book's own words. */
 export async function title(ctx, stave, name, { hold = 2200 } = {}) {
-  const card = el("div", "title-card", `<span class="stave">${esc(stave)}</span><span class="name">${esc(name)}</span>`);
+  const card = el("div", "title-card", `<div class="plate"><span class="stave">${esc(stave)}</span><span class="name">${esc(name)}</span></div>`);
   ctx.ui.appendChild(card);
   requestAnimationFrame(() => card.classList.add("on"));
   try {
@@ -51,7 +51,9 @@ export function dock(ctx, text, buttons = [], { accent } = {}) {
   };
 }
 
-/** Type lines into an element in monospace, fast: files speak in code. */
+const quoted = (line) => `\u201C${line}\u201D`;
+
+/** Type lines into an element in monospace, fast: files speak in code, in their own quoted voice. */
 async function typeLines(ctx, host, lines, cps = 46) {
   host.innerHTML = "";
   for (const line of lines) {
@@ -87,7 +89,7 @@ export async function fileCard(ctx, f, { auto = null } = {}) {
   ctx.ui.appendChild(card);
   requestAnimationFrame(() => card.classList.add("on"));
   try {
-    await typeLines(ctx, card.querySelector(".says"), f.lines);
+    await typeLines(ctx, card.querySelector(".says"), f.lines.map(quoted));
     const row = card.querySelector(".choices");
     for (const [key, label, primary] of [["rest", "Lay to rest", true], ["banish", "Banish"], ["keep", "Keep"]]) {
       const b = el("button", primary ? "primary" : "", label); b.type = "button"; b.dataset.key = key; row.appendChild(b);
@@ -141,7 +143,7 @@ export function presentRow(ctx, group) {
       for (let i = 0; i < cards.length; i++) {
         cards[i].classList.add("on");
         await wait(250, ctx.signal);
-        await typeLines(ctx, cards[i].querySelector(".claim"), [shown[i].claim], 52);
+        await typeLines(ctx, cards[i].querySelector(".claim"), [quoted(shown[i].claim)], 52);
         await wait(500, ctx.signal);
       }
     },

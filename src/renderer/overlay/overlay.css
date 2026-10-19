@@ -72,7 +72,10 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
 .v-past { --accent: var(--past); } .v-present { --accent: var(--present); } .v-you { --accent: var(--yet); }
 
 /* ---------- title cards ---------- */
-.title-card { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 10px; opacity: 0; transition: opacity .8s; }
+.title-card { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; opacity: 0; transition: opacity .8s; }
+/* a feathered dark plate behind, so the title reads over anything: a bright window, the morning coming up */
+.title-card .plate { display: grid; gap: 10px; justify-items: center; padding: 22px 46px 26px; border-radius: 22px;
+  background: rgba(6, 6, 11, .62); box-shadow: 0 0 70px 40px rgba(6, 6, 11, .55); }
 .title-card.on { opacity: 1; }
 .title-card .stave { font-family: var(--mono); font-size: 13px; letter-spacing: .32em; text-transform: uppercase; color: var(--dim); }
 .title-card .name { font-family: var(--display); font-size: clamp(34px, 4.4vw, 60px); line-height: 1.05; color: #f2effa; text-shadow: 0 0 24px rgba(0, 0, 0, .8); }
@@ -118,7 +121,7 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
 .file .preview, .copy .preview { display: block; max-width: 100%; max-height: 150px; margin: 8px auto 2px; border-radius: 6px; object-fit: contain;
   background: rgba(255, 255, 255, .04); box-shadow: 0 0 0 1px rgba(255, 255, 255, .12); }
 .copy .preview { max-height: 120px; margin-block: 2px; }
-.file .says { margin-block: 10px 2px; min-height: 2.8em; white-space: pre-wrap; }
+.file .says { margin-block: 10px 2px; min-height: 2.8em; white-space: pre-wrap; font-style: italic; }
 .file .says p { margin: 0 0 4px; }
 .file .choices { margin-block-start: 10px; }
 .file.gone { opacity: 0; filter: blur(6px); transform: translateY(24px); }
@@ -133,7 +136,7 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
 .copy header img, .copy header .noicon { width: 32px; height: 32px; image-rendering: pixelated; }
 .copy .name { font-weight: 600; color: #fff; word-break: break-all; }
 .copy .meta { color: var(--dim); font-size: 11px; }
-.copy .claim { min-height: 3.6em; }
+.copy .claim { min-height: 3.6em; font-style: italic; }
 .copy button { justify-self: start; transition: opacity .4s; }
 .row.waiting button { opacity: 0; pointer-events: none; }
 .copy.impostor { opacity: 0; transform: translateY(60px) rotate(var(--tilt, 4deg)); filter: blur(5px); transition: opacity 1s .2s, transform 1.2s cubic-bezier(.5, 0, .9, .5), filter 1s; }
