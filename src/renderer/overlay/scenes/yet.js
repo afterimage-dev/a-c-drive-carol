@@ -32,7 +32,7 @@ export async function yet(ctx) {
   stage.ramp = "yet";
   stage.poolLevel = 0;
   stage.sys.fog = 0.25;
-  stage.sys.ambient = 0.12;   // almost nothing of him shows without your light...
+  stage.sys.ambient = 0.03;   // all but invisible without your light...
   stage.sys.fall = 9;         // ...and your light only reaches so far
   stage.sys.rimAtt = 1;       // even his outline only catches light near the flame
   stage.sys.candleLight = 1.5;
@@ -48,12 +48,11 @@ export async function yet(ctx) {
   // how well your candle lights him, 0..1, and his shedding pixels follow it so they don't give him away
   const lit = () => {
     const p = stage.ptr;
-    if (!p.seen && !ctx.settings.autoplay) return 0;
+    if (!p.seen) return 0;
     const d = Math.min(...PARTS.map(([x, y]) => { const w = sp.sp.bodyToWorld(x, y); return Math.hypot(p.x - w.x, p.y - w.y); }));
     return clamp(1 - (d - sp.h * 0.12) / (sp.h * 0.3));
   };
-  const shed = stage.add(() => { sp.s.pRate = 0.15 + 0.85 * lit(); });
-  if (ctx.settings.autoplay) setTimeout(() => { const c = sp.centre(); stage.ptr.x = c.x; stage.ptr.y = c.y; }, 2500);
+  const shed = stage.add(() => { sp.s.pRate = lit(); });   // no drifting pixels to give him away in the dark
 
   /** Resolves once he has been lit for `ms` without a break. Glints to show where he is if you can't find him. */
   const found = (ms = 1000) => until((resolve) => {
@@ -133,6 +132,7 @@ export async function yet(ctx) {
   // he shrinks, collapses, and dwindles into your cursor; the heartbeat stops dead
   arm();
   shed();
+  sp.s.pRate = 1;
   sound.heartbeat(0);
   sp.s.tremble = 0;
   const from = sp.height;

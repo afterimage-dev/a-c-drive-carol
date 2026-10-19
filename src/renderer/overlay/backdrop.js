@@ -124,24 +124,31 @@ export class Backdrop {
 }
 
 /**
- * Darkness everywhere except a pool round your cursor: your candle is the only light. `radius` is the clear pool in
- * pixels; set `.gutter` (0..1) to make the flame shrink and flicker. Returns { sprite, set, stop }.
+ * Darkness everywhere except a pool round your cursor: your candle is the only light. Drawn each frame into a small
+ * full-screen canvas (so it always covers the whole screen, wherever the pool is) and scaled up softly.
+ * `radius` is the clear pool in pixels; set `.gutter` (0..1) to make the flame shrink and flicker.
  */
 export function darkness(stage, { radius = 190 } = {}) {
-  const size = 1024, c = document.createElement("canvas"); c.width = c.height = size;
-  const g = c.getContext("2d"), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.05, "rgba(0,0,0,0.15)"); gr.addColorStop(0.11, "rgba(0,0,0,0.78)");
-  gr.addColorStop(0.2, "rgba(0,0,0,0.95)"); gr.addColorStop(1, "rgba(0,0,0,0.97)");
-  g.fillStyle = gr; g.fillRect(0, 0, size, size);
-  const s = new PIXI.Sprite(PIXI.Texture.from(c)); s.anchor.set(0.5); s.alpha = 0;
+  const k = 8, c = document.createElement("canvas");   // one canvas pixel per 8 screen pixels: darkness can be soft
+  c.width = Math.ceil(stage.W / k); c.height = Math.ceil(stage.H / k);
+  const g = c.getContext("2d");
+  const tex = PIXI.Texture.from(c);
+  const s = new PIXI.Sprite(tex); s.width = stage.W; s.height = stage.H; s.alpha = 0;
   stage.layers.dim.addChild(s);
   const ctl = { sprite: s, gutter: 0, alpha: 0, target: 1, black: 0 };
   const off = stage.add((t, dt) => {
     ctl.alpha += (ctl.target - ctl.alpha) * Math.min(1, dt * 1.5);
     const flick = stage.reduced ? 0 : ctl.gutter * (0.18 * Math.sin(t * 17) * Math.sin(t * 5.3) + 0.12 * (Math.random() - 0.5));
-    const r = radius * (1 - 0.45 * ctl.gutter + flick);
-    s.width = s.height = (r / 0.08) * 2;   // the clear pool sits at about 8% of the texture's radius
-    s.position.set(stage.ptr.x, stage.ptr.y);
+    const r = radius * (1 - 0.45 * ctl.gutter + flick) / k, x = stage.ptr.x / k, y = stage.ptr.y / k;
+    g.globalCompositeOperation = "copy";
+    g.fillStyle = "rgba(0,0,0,0.97)"; g.fillRect(0, 0, c.width, c.height);
+    if (!ctl.black && stage.ptr.seen) {
+      g.globalCompositeOperation = "destination-out";
+      const gr = g.createRadialGradient(x, y, 0, x, y, r * 2.4);
+      gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(0.3, "rgba(0,0,0,0.9)"); gr.addColorStop(0.6, "rgba(0,0,0,0.3)"); gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr; g.fillRect(x - r * 2.5, y - r * 2.5, r * 5, r * 5);
+    }
+    tex.baseTexture.update();
     s.alpha = Math.min(1, ctl.alpha + ctl.black);
   });
   ctl.stop = () => { off(); stage.layers.dim.removeChild(s); s.destroy({ texture: true, baseTexture: true }); };
