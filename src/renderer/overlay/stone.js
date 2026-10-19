@@ -8,10 +8,10 @@ const LINES = [{ y: -44, size: 21, alpha: 1 }, { y: -8, size: 15, alpha: 1 }, { 
 
 const VERT = `attribute vec2 aVertexPosition; attribute vec2 aTextureCoord; uniform mat3 projectionMatrix; uniform mat3 translationMatrix; uniform mat3 uTextureMatrix; varying vec2 vTextureCoord;
   void main(void){ gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0); vTextureCoord = (uTextureMatrix * vec3(aTextureCoord, 1.0)).xy; }`;
-const FRAG = `precision mediump float; varying vec2 vTextureCoord; uniform sampler2D uSampler; uniform sampler2D uNormal; uniform vec4 uColor; uniform vec2 uSize; uniform vec3 uKey; uniform float uAmb;
+const FRAG = `precision mediump float; varying vec2 vTextureCoord; uniform sampler2D uSampler; uniform sampler2D uNormal; uniform vec4 uColor; uniform vec2 uSize; uniform vec3 uKey; uniform float uAmb; uniform float uFall;
   void main(void){ vec4 c = texture2D(uSampler, vTextureCoord); if (c.a < 0.004) { gl_FragColor = vec4(0.0); return; }
-    vec3 n = texture2D(uNormal, vTextureCoord).xyz * 2.0 - 1.0; vec3 L = normalize(uKey - vec3(vTextureCoord * uSize, 0.0));
-    float k = uAmb + 1.1 * max(dot(n, L), 0.0); gl_FragColor = vec4(c.rgb * k, c.a) * uColor; }`;
+    vec3 n = texture2D(uNormal, vTextureCoord).xyz * 2.0 - 1.0; vec3 D = uKey - vec3(vTextureCoord * uSize, 0.0); vec3 L = normalize(D);
+    float k = uAmb + 1.1 * max(dot(n, L), 0.0) / (1.0 + dot(D, D) * uFall); gl_FragColor = vec4(c.rgb * k, c.a) * uColor; }`;
 
 export class Stone {
   constructor(stage, sound) {
@@ -24,7 +24,7 @@ export class Stone {
     this.halves = [0, 1].map((side) => {
       const tex = new PIXI.Texture(T.stone.baseTexture, new PIXI.Rectangle(side ? w / 2 : 0, 0, w / 2, h));
       const ntex = new PIXI.Texture(T.stone_normal.baseTexture, new PIXI.Rectangle(side ? w / 2 : 0, 0, w / 2, h));
-      const mesh = new PIXI.Mesh(new PIXI.PlaneGeometry(w / 2, h, 2, 2), new PIXI.MeshMaterial(tex, { program, uniforms: { uNormal: ntex, uSize: [w, h], uKey: [0, 0, 300], uAmb: 0.35 } }));
+      const mesh = new PIXI.Mesh(new PIXI.PlaneGeometry(w / 2, h, 2, 2), new PIXI.MeshMaterial(tex, { program, uniforms: { uNormal: ntex, uSize: [w, h], uKey: [0, 0, 300], uAmb: 0.35, uFall: 0 } }));
       const holder = new PIXI.Container();
       holder.addChild(mesh);
       mesh.position.set(side ? 0 : -w / 2, -h);
@@ -45,6 +45,8 @@ export class Stone {
       return tx;
     });
     this.queue = [];
+    this.ambient = 0.35;   // in the dark, lower, with `fall` so only your candle shows it
+    this.fall = 0;
     this.rise = 0; this.riseTo = 0;
     this.broken = false;
     this.dust = [];
@@ -97,8 +99,14 @@ export class Stone {
       const mesh = hv.children[0];
       const L = mesh.toLocal(new PIXI.Point(ptr.x, ptr.y));
       mesh.material.uniforms.uKey = [L.x + hv.offsetX, L.y, 260 / this.scale];
+      mesh.material.uniforms.uAmb = this.ambient;
+      mesh.material.uniforms.uFall = this.fall / (this.scale * this.scale);
       if (this.broken) { hv.vy += 900 * dt; hv.x += hv.vx * dt; hv.y += hv.vy * dt; hv.rotation += hv.vr * dt; hv.alpha = Math.max(0, hv.alpha - dt * 0.5); }
     }
+    if (this.fall) {   // the carving is only legible as your light reaches it
+      const p = this.carve.toGlobal(new PIXI.Point(0, 0)), d = Math.hypot(ptr.x - p.x, ptr.y - p.y);
+      this.carve.alpha = 0.35 + 0.65 * clamp(1 - (d - 120) / 420);
+    } else this.carve.alpha = 1;
     const job = this.queue[0];
     if (job) {
       const tx = this.texts[job.i];

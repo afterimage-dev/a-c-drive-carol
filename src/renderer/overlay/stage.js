@@ -123,6 +123,7 @@ export async function createStage(host) {
     ramp: "marl",
     focus: null,
     glowStrength: 1,
+    poolLevel: 1,            // the spirit's light cast on the scene behind it (off when only your candle lights it)
     layers: {}
   };
 
@@ -171,6 +172,7 @@ export async function createStage(host) {
     for (const c of [...L.dim.children]) if (c !== dim) { L.dim.removeChild(c); c.destroy(); }
     for (const c of [...sys.world.children]) if (c !== sys.particles && c !== sys.spirits) { sys.world.removeChild(c); c.destroy({ children: true }); }
     sys.glitch = 0;
+    sys.ambient = 1; sys.fall = 1; sys.lightI = 1; sys.rimAtt = 0; stage.poolLevel = 1;
     dim.alpha = 0;
     stage.focus = null;
   };
@@ -196,7 +198,7 @@ export async function createStage(host) {
     for (const p of stage.puppets) p.update(t, dt);
     const lead = [...stage.puppets].at(-1);
     const focus = stage.focus ?? (lead ? { x: lead.M.x, y: lead.M.y + lead.h * 0.25, r: lead.h } : null);
-    sys.frame(t, dt, stage.ramp, { focus, pool: focus ? 1 : 0, bloom: 0.42 * stage.glowStrength });
+    sys.frame(t, dt, stage.ramp, { focus, pool: focus ? stage.poolLevel : 0, bloom: 0.42 * stage.glowStrength });
   });
   stage.time = () => t;
   /** Where the pointer was `seconds` ago (for the doppelgänger cursor). */

@@ -34,7 +34,7 @@
     precision mediump float;
     varying vec2 vTextureCoord;
     uniform sampler2D uSampler; uniform sampler2D uNormal; uniform vec4 uColor;
-    uniform vec2 uSize; uniform vec3 uKey; uniform float uKeyI; uniform float uAmb; uniform float uRim; uniform float uFall;
+    uniform vec2 uSize; uniform vec3 uKey; uniform float uKeyI; uniform float uAmb; uniform float uRim; uniform float uFall; uniform float uRimAtt;
     void main(void) {
       vec4 c = texture2D(uSampler, vTextureCoord);
       if (c.a < 0.004) { gl_FragColor = vec4(0.0); return; }
@@ -45,7 +45,7 @@
       float diff = max(dot(n, L), 0.0);
       float att = 1.0 / (1.0 + d * d * uFall);
       float edge = 1.0 - clamp(n.z, 0.0, 1.0);
-      float rim = edge * edge * uRim * (0.4 + 0.6 * max(dot(normalize(n.xy + vec2(1e-4)), normalize(L.xy + vec2(1e-4))), 0.0));
+      float rim = edge * edge * uRim * (0.4 + 0.6 * max(dot(normalize(n.xy + vec2(1e-4)), normalize(L.xy + vec2(1e-4))), 0.0)) * mix(1.0, att, uRimAtt);
       float k = uAmb + uKeyI * diff * att + rim;
       gl_FragColor = vec4(c.rgb * k, c.a) * uColor;
     }`;
@@ -151,7 +151,7 @@
     const sys = { world, particles, spirits, output, lowRT, cell, W, H, glitch: 0, fog: 1, light: { x: W * 0.3, y: H * 0.25, z: 320 } };
 
     function mkMesh(tex, normal, w, h, nx, ny, lighting) {
-      const mat = new PIXI.MeshMaterial(tex, { program: LIT_PROGRAM, uniforms: { uNormal: normal, uSize: [w, h], uKey: [0, 0, 300], uKeyI: lighting.key, uAmb: lighting.amb, uRim: lighting.rim, uFall: 0.0000025 } });
+      const mat = new PIXI.MeshMaterial(tex, { program: LIT_PROGRAM, uniforms: { uNormal: normal, uSize: [w, h], uKey: [0, 0, 300], uKeyI: lighting.key, uAmb: lighting.amb, uRim: lighting.rim, uFall: 0.0000025, uRimAtt: 0 } });
       const mesh = new PIXI.Mesh(new PIXI.PlaneGeometry(w, h, nx, ny), mat);
       mesh.buf = mesh.geometry.getBuffer("aVertexPosition"); mesh.base = Float32Array.from(mesh.buf.data);
       return mesh;
@@ -255,7 +255,7 @@
         // light: the key light, in this spirit's own image pixels
         const L = this.body.toLocal(new PIXI.Point(sys.light.x, sys.light.y), world);
         const z = sys.light.z / Math.max(0.05, this.scale);
-        for (const mesh of [this.bodyMesh, this.headMesh, ...this.twins.flatMap((tw) => (tw.on ? [tw.body, tw.head] : []))]) { const u = mesh.material.uniforms; u.uKey[0] = L.x; u.uKey[1] = L.y; u.uKey[2] = z; u.uKeyI = c.light.key * (sys.lightI ?? 1); u.uAmb = c.light.amb; }
+        for (const mesh of [this.bodyMesh, this.headMesh, ...this.twins.flatMap((tw) => (tw.on ? [tw.body, tw.head] : []))]) { const u = mesh.material.uniforms; u.uKey[0] = L.x; u.uKey[1] = L.y; u.uKey[2] = z; u.uKeyI = c.light.key * (sys.lightI ?? 1); u.uAmb = c.light.amb * (sys.ambient ?? 1); u.uFall = 0.0000025 * (sys.fall ?? 1); u.uRimAtt = sys.rimAtt ?? 0; }
         this.glow.alpha = c.glowA * (0.8 + 0.2 * Math.sin(t * 1.1)) + S.flare * 0.08;
         // eyes ride the head
         const blinkPhase = (t * 0.31 + c.w * 0.001) % 1, blink = blinkPhase > 0.965 ? Math.abs(Math.cos(Math.PI * (blinkPhase - 0.965) / 0.035)) * 0.92 + 0.08 : 1, open = blink * S.eyesOpen, flare = 1 + S.flare * 0.18;

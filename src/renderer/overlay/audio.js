@@ -148,8 +148,8 @@ export class Sound {
     this.loops.scrape.gain.setTargetAtTime(Math.min(0.25, level) * (this.enabled ? 1 : 0), this.ac.currentTime, 0.06);
   }
 
-  /** Low wind for the last spirit. */
-  wind(on) {
+  /** Low wind for the last spirit. `fast` cuts it dead instead of letting it die away. */
+  wind(on, { fast = false } = {}) {
     this.ensure();
     if (on && !this.loops.wind && this.enabled) {
       const ac = this.ac, src = this.noiseSource(true), a = this.band(300, 900), b = this.band(900, 2200), g = ac.createGain(), mix = ac.createGain();
@@ -160,9 +160,42 @@ export class Sound {
       this.loops.wind = { mix, src, lfo };
     } else if (!on && this.loops.wind) {
       const w = this.loops.wind, t = this.ac.currentTime;
-      w.mix.gain.setTargetAtTime(0, t, 0.6); w.src.stop(t + 3); w.lfo.stop(t + 3);
+      w.mix.gain.setTargetAtTime(0, t, fast ? 0.04 : 0.6); w.src.stop(t + 3); w.lfo.stop(t + 3);
       this.loops.wind = null;
     }
+  }
+
+  /** A heartbeat at `bpm` (lub-dub, low and close), or stop it with 0. Changing bpm while it beats changes its pace. */
+  heartbeat(bpm) {
+    if (!bpm) { clearTimeout(this.beatTimer); this.beatTimer = null; this.bpm = 0; return; }
+    this.bpm = bpm;
+    if (this.beatTimer || !this.enabled) return;
+    const beat = () => {
+      if (!this.bpm) return;
+      const ac = this.ensure(), t = ac.currentTime + 0.02, out = this.out(0.5, 0, 0.15);
+      for (const [at, f, a] of [[0, 58, 1], [0.17, 50, 0.65]]) {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.frequency.setValueAtTime(f, t + at); o.frequency.exponentialRampToValueAtTime(f * 0.65, t + at + 0.12);
+        g.gain.setValueAtTime(0, t + at); g.gain.linearRampToValueAtTime(a, t + at + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.2);
+        o.connect(g); g.connect(out); o.start(t + at); o.stop(t + at + 0.25);
+      }
+      this.beatTimer = setTimeout(beat, 60000 / this.bpm);
+    };
+    beat();
+  }
+
+  /** One deep thud: something heavy, very close. */
+  thud() {
+    if (!this.enabled) return;
+    const ac = this.ensure(), t = ac.currentTime + 0.02, out = this.out(0.8, 0, 0.55);
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.setValueAtTime(52, t); o.frequency.exponentialRampToValueAtTime(26, t + 1.1);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 1.7);
+    const n = this.noiseSource(), f = ac.createBiquadFilter(), ng = ac.createGain();
+    f.type = "lowpass"; f.frequency.value = 260;
+    ng.gain.setValueAtTime(0.7, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    n.connect(f); f.connect(ng); ng.connect(out); n.start(t); n.stop(t + 0.4);
   }
 
   /** The chisel: one short grind per carved letter. */
@@ -290,6 +323,7 @@ export class Sound {
   stopAll() {
     this.scrape(0);
     this.wind(false);
+    this.heartbeat(0);
     this.music(null);
   }
 }

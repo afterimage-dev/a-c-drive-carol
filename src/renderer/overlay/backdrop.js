@@ -60,9 +60,9 @@ export class Backdrop {
   constructor(stage) {
     this.stage = stage;
     this.sprite = null;
-    this.level = { dim: 0, frost: 0, warp: 0, flicker: 0 };
+    this.level = { dim: 0, frost: 0, warp: 0, flicker: 0, drain: 0 };
     this.target = { ...this.level };
-    this.rate = { dim: 1, frost: 0.05, warp: 0.3, flicker: 1 };
+    this.rate = { dim: 1, frost: 0.05, warp: 0.3, flicker: 1, drain: 0.05 };
     this.off = stage.add((t, dt) => this.update(t, dt));
   }
 
@@ -109,12 +109,43 @@ export class Backdrop {
       this.noise.x = -t * 18; this.noise.y = Math.sin(t * 0.21) * 40;
     }
     if (this.frost) this.frost.forEach((s, i) => { s.alpha = clamp(L.frost * 3 - i) * 0.85; });
+    if (this.colour && Math.abs(L.drain - (this.drained ?? 0)) > 0.002) {   // colour drains towards grey, a little cold
+      const k = L.drain, a = 1 - k;
+      const r = 0.299 * k, g = 0.587 * k, b = 0.114 * k;
+      this.colour.matrix = [a + r, g, b, 0, 0, r, a + g, b, 0, 0, r, g, a + b, 0, 0.02 * k, 0, 0, 0, 1, 0];
+      this.drained = L.drain;
+    }
   }
 
   remove() {
     this.off();
     this.sprite?.texture.destroy(true);
   }
+}
+
+/**
+ * Darkness everywhere except a pool round your cursor: your candle is the only light. `radius` is the clear pool in
+ * pixels; set `.gutter` (0..1) to make the flame shrink and flicker. Returns { sprite, set, stop }.
+ */
+export function darkness(stage, { radius = 190 } = {}) {
+  const size = 1024, c = document.createElement("canvas"); c.width = c.height = size;
+  const g = c.getContext("2d"), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.05, "rgba(0,0,0,0.15)"); gr.addColorStop(0.11, "rgba(0,0,0,0.78)");
+  gr.addColorStop(0.2, "rgba(0,0,0,0.95)"); gr.addColorStop(1, "rgba(0,0,0,0.97)");
+  g.fillStyle = gr; g.fillRect(0, 0, size, size);
+  const s = new PIXI.Sprite(PIXI.Texture.from(c)); s.anchor.set(0.5); s.alpha = 0;
+  stage.layers.dim.addChild(s);
+  const ctl = { sprite: s, gutter: 0, alpha: 0, target: 1, black: 0 };
+  const off = stage.add((t, dt) => {
+    ctl.alpha += (ctl.target - ctl.alpha) * Math.min(1, dt * 1.5);
+    const flick = stage.reduced ? 0 : ctl.gutter * (0.18 * Math.sin(t * 17) * Math.sin(t * 5.3) + 0.12 * (Math.random() - 0.5));
+    const r = radius * (1 - 0.45 * ctl.gutter + flick);
+    s.width = s.height = (r / 0.08) * 2;   // the clear pool sits at about 8% of the texture's radius
+    s.position.set(stage.ptr.x, stage.ptr.y);
+    s.alpha = Math.min(1, ctl.alpha + ctl.black);
+  });
+  ctl.stop = () => { off(); stage.layers.dim.removeChild(s); s.destroy({ texture: true, baseTexture: true }); };
+  return ctl;
 }
 
 /** The cold: the screen's edges tint icy blue for a couple of seconds, then fade. */

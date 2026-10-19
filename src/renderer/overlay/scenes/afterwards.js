@@ -57,7 +57,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
   stage.sys.fog = 1;
   const backdrop = ctx.backdrop = new Backdrop(stage);
   await backdrop.show(bytes);
-  const stopCandle = candle(stage);
+  const flame = ctx.candle = candle(stage);
   ui.appendChild(el("div", "esc-hint", "Click or Space to go on · Esc to wake"));
   backdrop.set({ dim: 0.62, flicker: 0.5, frost: 0.3, warp: 4 }, { dim: 0.4, frost: 0.05, warp: 1 });
   await wait(1200, signal);
@@ -127,7 +127,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
     });
     if (ctx.settings.autoplay) setTimeout(resolve, 3000);
   }, signal);
-  stopCandle();
+  flame.stop();
   ctx.carol.done("mini", { openCrypt: !!ctx.openCryptAfter });
 }
 

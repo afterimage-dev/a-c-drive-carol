@@ -36,7 +36,7 @@ export async function visit(ctx, { backdrop: bytes }) {
   stage.sys.fog = 1;
   ctx.backdrop = new Backdrop(stage);
   await ctx.backdrop.show(bytes);
-  const stopCandle = candle(stage);
+  const flame = ctx.candle = candle(stage);
   ui.appendChild(el("div", "esc-hint", "Click or Space to go on · Esc to wake"));
   if (night.simulated) ui.appendChild(el("div", "sample-tag", "Sample files"));
 
@@ -44,6 +44,6 @@ export async function visit(ctx, { backdrop: bytes }) {
   if (start > 0) ctx.backdrop.set({ dim: 0.68, frost: 0.4, warp: 5, flicker: 0.6 }, { dim: 5, frost: 5, warp: 50, flicker: 5 });
   for (const name of ORDER.slice(start)) await STAVES[name](ctx);
 
-  stopCandle();
+  flame.stop();
   ctx.carol.done("morning", { openCrypt: !!ctx.openCryptAfter });
 }

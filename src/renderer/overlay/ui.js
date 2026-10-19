@@ -226,7 +226,7 @@ export function twinCursor(stage) {
   return () => { off(); g.destroy(); };
 }
 
-/** A soft warm glow at the pointer: your cursor is the candle that lights the spirits. */
+/** A soft warm glow at the pointer: your cursor is the candle that lights the spirits. Set `.gutter` (0..1). */
 export function candle(stage) {
   const c = document.createElement("canvas"); c.width = c.height = 128;
   const g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -234,10 +234,14 @@ export function candle(stage) {
   g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
   const s = new PIXI.Sprite(PIXI.Texture.from(c)); s.anchor.set(0.5); s.blendMode = PIXI.BLEND_MODES.ADD; s.alpha = 0;
   stage.layers.cursor.addChild(s);
+  const ctl = { gutter: 0, bright: 1 };
   const off = stage.add((t) => {
+    const g = ctl.gutter, flick = stage.reduced ? 0 : (0.08 + 0.3 * g) * Math.sin(t * (13 + 9 * g)) + (0.05 + 0.2 * g) * Math.sin(t * 29) + g * 0.15 * (Math.random() - 0.5);
     s.position.set(stage.ptr.x, stage.ptr.y);
-    s.alpha = stage.ptr.seen ? 0.55 : 0;
-    s.scale.set((0.9 + 0.08 * Math.sin(t * 13) + 0.05 * Math.sin(t * 29)) * 1.6);
+    s.alpha = stage.ptr.seen ? 0.55 * ctl.bright * (1 - 0.3 * g) : 0;
+    s.scale.set((0.9 + flick) * 1.6 * (1 - 0.35 * g) * ctl.bright);
+    stage.sys.lightI = (stage.sys.candleLight ?? 1) * (1 - 0.4 * g + flick * 0.6);
   });
-  return () => { off(); s.destroy({ texture: true, baseTexture: true }); };
+  ctl.stop = () => { off(); stage.sys.lightI = 1; s.destroy({ texture: true, baseTexture: true }); };
+  return ctl;
 }
