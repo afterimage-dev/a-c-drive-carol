@@ -6,3 +6,4 @@ assets/sprites/_grids/
 assets/sprites/_tmp/
 *.log
 __pycache__/
+.scratch/

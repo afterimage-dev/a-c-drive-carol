@@ -168,7 +168,19 @@ function hashFile(abs, limit = Infinity) {
 }
 
 // ---------- The scan ----------
-export async function scan({ roots = defaultRoots(), crypt = defaultCrypt(), onProgress = () => {} } = {}) {
+/** True if `p` is inside any of `dirs` (case-insensitive, as Windows paths are). */
+function within(p, dirs) {
+  const r = path.resolve(p).toLowerCase();
+  return dirs.some((d) => { const base = path.resolve(d).toLowerCase(); return r === base || r.startsWith(base + path.sep); });
+}
+
+/**
+ * @param {object} opts
+ * @param {Object<string,string>} [opts.roots]  folders to look in
+ * @param {string} [opts.crypt]                 the Crypt (never scanned)
+ * @param {string[]} [opts.cloud]               cloud-synced folders (OneDrive); files there are marked and never moved
+ */
+export async function scan({ roots = defaultRoots(), crypt = defaultCrypt(), cloud = [], onProgress = () => {} } = {}) {
   const found = [];
   for (const [name, p] of Object.entries(roots)) if (fs.existsSync(p)) walk(name, p, found);
   const cryptAbs = path.resolve(crypt).toLowerCase();
@@ -187,8 +199,8 @@ export async function scan({ roots = defaultRoots(), crypt = defaultCrypt(), onP
   // the same file reached by two paths (a hard link) isn't a duplicate
   const seenIno = new Set();
   candidates = candidates.filter((f) => { const k = `${f.st.dev}:${f.st.ino}`; if (f.st.ino && seenIno.has(k)) return false; seenIno.add(k); return true; });
-  const cloud = cloudOnly(candidates.map((f) => f.abs));
-  candidates = candidates.filter((f) => !cloud.has(f.abs));
+  const placeholders = cloudOnly(candidates.map((f) => f.abs));
+  candidates = candidates.filter((f) => !placeholders.has(f.abs));
   onProgress(`Checking ${candidates.length} possible duplicates`);
   const quick = new Map();
   for (const f of candidates) {
@@ -241,6 +253,7 @@ export async function scan({ roots = defaultRoots(), crypt = defaultCrypt(), onP
       group: null,
       installer,
       timesBanished: 0,
+      cloudSynced: cloud.length ? within(f.abs, cloud) : false,
       simulated: []
     };
   });

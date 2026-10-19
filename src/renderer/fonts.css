@@ -1,0 +1,12 @@
+/* Every typeface is bundled (SIL Open Font License): the app never fetches anything. */
+@import url("../../node_modules/@fontsource/im-fell-english/400.css");
+@import url("../../node_modules/@fontsource/im-fell-english/400-italic.css");
+@import url("../../node_modules/@fontsource/cormorant-garamond/300-italic.css");
+@import url("../../node_modules/@fontsource/abril-fatface/400.css");
+@import url("../../node_modules/@fontsource/cinzel/700.css");
+@import url("../../node_modules/@fontsource/jetbrains-mono/400.css");
+@import url("../../node_modules/@fontsource/jetbrains-mono/600.css");
+@import url("../../node_modules/@fontsource/ibm-plex-mono/300.css");
+@import url("../../node_modules/@fontsource/atkinson-hyperlegible/400.css");
+@import url("../../node_modules/@fontsource/atkinson-hyperlegible/400-italic.css");
+@import url("../../node_modules/@fontsource/atkinson-hyperlegible/700.css");

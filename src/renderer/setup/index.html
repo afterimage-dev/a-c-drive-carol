@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:">
+<title>A C-Drive Carol</title>
+<link rel="stylesheet" href="../fonts.css">
+<link rel="stylesheet" href="setup.css">
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">A retelling of the greatest ghost story in English</p>
+    <h1>A C-Drive Carol</h1>
+    <p class="lede">The miser is you, and the hoard is your hard drive. Three spirits will visit your desktop, and show you what you've kept.</p>
+  </header>
+
+  <section class="rules" aria-label="What it does">
+    <div><h2>What it looks at</h2><p>Only your own <span class="path" data-place="Downloads"></span>, <span class="path" data-place="Desktop"></span> and <span class="path" data-place="Documents"></span> folders. Nothing else on the drive.</p></div>
+    <div><h2>Nothing leaves this computer</h2><p>No network, no AI services, no analytics. Every line the spirits say is a written template filled in here.</p></div>
+    <div><h2>Nothing is deleted</h2><p>Files you lay to rest are moved into the Crypt (<span class="path" data-place="crypt"></span>). Resurrect them any time. Only you can bury them, by emptying the Crypt yourself.</p></div>
+    <div><h2>Nothing moves without you</h2><p>The spirits only queue your choices. Nothing moves until you confirm a final review. Press Esc at any moment to end a visit with nothing changed.</p></div>
+    <p class="cloud" hidden>Your Documents folder is synced to the cloud, so the Crypt lives in your home folder instead, and files in synced folders are never moved.</p>
+  </section>
+
+  <section class="settings" aria-label="Settings">
+    <label class="toggle"><input type="checkbox" id="sound"> <span>Sound (quiet)</span></label>
+    <label class="toggle"><input type="checkbox" id="startWithWindows"> <span>Start with Windows</span></label>
+  </section>
+
+  <section class="begin" id="begin">
+    <button type="button" class="primary" data-mode="real">Haunt my computer</button>
+    <button type="button" data-mode="sample">Summon the spirits with sample files</button>
+    <p class="hint">Sample files are a few tiny stand-ins (under 40 KB in all) made just for the demo. Their sizes and dates are simulated, and labelled so.</p>
+    <p class="progress" id="progress" aria-live="polite"></p>
+  </section>
+
+  <section class="crypt" id="crypt" hidden>
+    <h2>The Crypt</h2>
+    <p id="restingLine"></p>
+    <div class="row"><button type="button" id="openCrypt">Open the Crypt</button><button type="button" id="resurrectAll">Resurrect everything</button></div>
+    <ul id="restingList"></ul>
+  </section>
+
+  <footer><span id="version"></span> · MIT · Typefaces under the SIL Open Font License</footer>
+</main>
+<script type="module" src="setup.js"></script>
+</body>
+</html>

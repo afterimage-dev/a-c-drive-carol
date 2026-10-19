@@ -75,10 +75,14 @@ export const LINES = {
     ],
     working: [
       "You fetched me at {time} on a {weekday}, in the middle of the working day. I was urgent, once.",
-      "{time}. Someone needed me by the afternoon. I wonder if they ever received me."
+      "{time}, on a {weekday}. Someone needed me that day. I wonder if they ever received me."
+    ],
+    weekend: [
+      "You fetched me at {time} on a {weekday}. A day of rest, and you spent part of it on me.",
+      "{weekday}, {time}. You might have been anywhere. You were here, fetching me."
     ],
     evening: [
-      "You fetched me at {time}, on a {weekday} evening, when the day's work was done. I was meant for pleasure.",
+      "You fetched me on a {weekday} evening, at {clock}, when the day's work was done. I was meant for pleasure.",
       "{time} on a {weekday}. You were tired, and hopeful, and you chose me."
     ]
   },
@@ -90,7 +94,7 @@ export const LINES = {
       "{site}. Do you even remember that place? I am all that is left of your visit."
     ],
     frequent: [
-      "I came from {site}, like {count} others in {folder}. We keep each other company.",
+      "I came from {site}, like {others} others in {folder}. We keep each other company.",
       "{site} again. You go there often. You bring things back. You leave them here.",
       "I am one of {count} from {site}. We are a family of the forgotten."
     ],
@@ -295,12 +299,19 @@ export function timeWords(d) {
 }
 
 export function timeOfDayPool(d) {
-  const h = d.getHours();
+  const h = d.getHours(), weekend = d.getDay() === 0 || d.getDay() === 6;
   if (h < 5) return "lateNight";
   if (h < 9) return "earlyMorning";
-  if (h < 18) return "working";
+  if (h < 18) return weekend ? "weekend" : "working";
   return "evening";
 }
+
+/** Just the clock: "7:40". */
+export function clockWords(d) {
+  return `${d.getHours() % 12 || 12}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+export const numberWords = words;
 
 /** "the 3rd of March" */
 export function dateWords(d) {

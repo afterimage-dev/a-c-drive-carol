@@ -24,6 +24,7 @@
  * @property {Installer|null} installer
  * @property {number}   timesBanished  how many times it has been banished before
  * @property {string[]} simulated      names of fields that are simulated (sample mode only)
+ * @property {boolean}  [cloudSynced]  true if it lives in a cloud-synced folder (OneDrive); never moved
  *
  * @typedef {Object} Installer
  * @property {string}      product     product name, e.g. "VLC media player"
@@ -42,7 +43,7 @@
  * @property {{id: string, hash: string, members: string[]}[]} groups
  */
 
-import { pick, ageWords, timeWords, timeOfDayPool, dateWords } from "./spirit-lines.js";
+import { pick, ageWords, timeWords, timeOfDayPool, dateWords, clockWords, numberWords } from "./spirit-lines.js";
 
 const DAY = 86400000;
 
@@ -70,7 +71,7 @@ const isCopyName = (name) => /\(\d+\)|^copy of |\s-\scopy\b/i.test(name);
 export function pastCandidates(m, { minAgeDays = 30, limit = 16 } = {}) {
   const oldestFirst = (a, b) => Date.parse(a.downloadedAt) - Date.parse(b.downloadedAt);
   const pool = m.files
-    .filter((f) => !f.group)
+    .filter((f) => !f.group && !f.cloudSynced)
     .filter((f) => daysSince(f.downloadedAt) >= minAgeDays)
     .filter((f) => /^(Downloads|Desktop)/.test(f.folder) || f.timesBanished > 0);
   // installers always get their say; the oldest of everything else fills the rest
@@ -119,12 +120,14 @@ export function facts(f, m) {
     size: humanSize(f.size),
     site: f.origin ? f.origin.site : undefined,
     time: timeWords(d),
+    clock: clockWords(d),
     weekday: WEEKDAYS[d.getDay()],
     date: dateWords(d),
     age: ageWords(days),
     days,
     folder: f.folder.includes("/") ? f.folder.split("/").pop() : `your ${f.folder}`,
     count: siteCount || undefined,
+    others: siteCount > 1 ? numberWords(siteCount - 1) : undefined,
     times: f.timesBanished ? (["", "once", "twice", "three times", "four times", "five times"][f.timesBanished] || `${f.timesBanished} times`) : undefined,
     app: f.installer ? f.installer.product : undefined,
     version: f.installer && f.installer.version ? f.installer.version : undefined,
@@ -192,7 +195,7 @@ export function forecast(m, buryBytes = 0, now = Date.now()) {
 }
 
 // Quick look: `node manifest.js path/to/manifest.json` prints what each spirit would say.
-if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/").split("/").pop())) {
+if (typeof process !== "undefined" && process.argv?.[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/").split("/").pop())) {
   const { readFileSync } = await import("node:fs");
   const path = process.argv[2];
   if (!path) { console.log("Usage: node manifest.js <manifest.json>"); process.exit(0); }

@@ -1,0 +1,254 @@
+// Marlware's chain: every link simulated (Verlet integration, 480 steps a second), forged from your biggest files.
+// Only his hand is moved by code; everything below it is physics. Ported from prototypes/chain/chain.src.html,
+// drawn as sprites in the spirits' world so it shows on the same phosphor as he does.
+
+const DT = 1 / 480, ITER = 8;
+const HAND = [298, 485];   // his chain hand, in the body sprite's pixels (assets/landmarks.json)
+const FILE = { w: 40, h: 50, pad: 9, scale: 3 };
+
+function fileIcon(ext) {
+  const s = FILE.scale, P = FILE.pad;
+  const c = document.createElement("canvas");
+  c.width = (FILE.w + P * 2) * s; c.height = (FILE.h + P * 2) * s;
+  const g = c.getContext("2d");
+  g.scale(s, s); g.translate(P, P);
+  const page = () => { g.beginPath(); g.moveTo(3, 0); g.lineTo(28, 0); g.lineTo(40, 12); g.lineTo(40, 47); g.quadraticCurveTo(40, 50, 37, 50); g.lineTo(3, 50); g.quadraticCurveTo(0, 50, 0, 47); g.lineTo(0, 3); g.quadraticCurveTo(0, 0, 3, 0); g.closePath(); };
+  g.lineWidth = 2.4;
+  page(); g.fillStyle = "rgba(143,240,238,.18)"; g.fill();
+  g.shadowColor = "#8ff0ee"; g.shadowBlur = 7; g.strokeStyle = "#e6fffd"; g.stroke();
+  g.beginPath(); g.moveTo(28, 0); g.lineTo(28, 12); g.lineTo(40, 12); g.stroke();
+  g.shadowBlur = 4; g.fillStyle = "#ffffff"; g.font = '600 11px "JetBrains Mono", monospace'; g.textAlign = "center";
+  g.fillText(ext.slice(0, 5), 20, 36);
+  g.beginPath(); g.arc(20, -4.5, 3.4, 0, Math.PI * 2); g.lineWidth = 1.8; g.strokeStyle = "#e6fffd"; g.stroke();
+  return PIXI.Texture.from(c);
+}
+
+export class Chain {
+  /**
+   * @param {object} stage
+   * @param {import("./stage.js").Puppet} puppet  Marlware
+   * @param {object} o  { links, floorY, exts: file extensions for the pendants, sound }
+   */
+  constructor(stage, puppet, { links = 34, floorY, exts = [".exe", ".zip", ".iso", "(1)"], sound = null } = {}) {
+    this.stage = stage;
+    this.puppet = puppet;
+    this.N = links;
+    this.floorY = floorY ?? stage.H;
+    this.sound = sound;
+    this.exts = exts.length ? exts : [".tmp"];
+    this.view = new PIXI.Container();
+    stage.sys.world.addChild(this.view);
+    this.grab = { i: -1, len: 0 };
+    this.acc = 0;
+    this.tmp = { x: 0, y: 0 };
+    this.events = [];
+    this.snapMax = 0; this.slide = 0;
+    this.build();
+    this.off = stage.add((t, dt) => this.update(dt));
+  }
+
+  hand() {
+    const sp = this.puppet.sp;
+    sp.bodyBend(HAND[0], HAND[1], this.tmp, sp.lastT || 0);
+    return sp.bodyToWorld(this.tmp.x, this.tmp.y);
+  }
+
+  build() {
+    const S = this.S = this.puppet.h;
+    const { N } = this;
+    this.Lh = S * 0.09; this.P = this.Lh * 0.62; this.Lp = this.Lh * 1.75; this.Fk = (this.Lh * 1.35) / FILE.h; this.g = 8.2 * S;
+    const fileAt = [];
+    for (let k = 7; k < N - 3; k += 8) fileAt.push(k);
+    const count = this.count = N + 2 + fileAt.length;
+    this.X = new Float32Array(count); this.Y = new Float32Array(count); this.PX = new Float32Array(count); this.PY = new Float32Array(count);
+    this.IM = new Float32Array(count); this.R = new Float32Array(count);
+    const { X, Y, PX, PY, IM, R, P, Lp, Fk } = this;
+    const h0 = this.hand(), rc = P * 0.42;
+    const place = (i, along) => {
+      let y = h0.y + along, x = h0.x;
+      if (y > this.floorY - rc) { x -= (y - (this.floorY - rc)); y = this.floorY - rc; }
+      X[i] = PX[i] = Math.max(rc, x); Y[i] = PY[i] = y;
+    };
+    for (let i = 0; i <= N; i++) { place(i, i * P); IM[i] = i === 0 ? 0 : 1; R[i] = rc; }
+    this.pend = [];
+    let idx = N + 1;
+    place(idx, N * P + Lp * 0.46); IM[idx] = 1 / 4; R[idx] = Lp * 0.36;
+    this.pend.push({ i: idx, at: N, kind: "lock", rest: Lp * 0.46 });
+    fileAt.forEach((at, n) => {
+      idx++;
+      const rest = (FILE.h / 2 + 7.9) * Fk;
+      X[idx] = PX[idx] = X[at] + 2; Y[idx] = PY[idx] = Y[at] + rest;
+      IM[idx] = 1 / 1.6; R[idx] = FILE.h * Fk * 0.36;
+      this.pend.push({ i: idx, at, kind: "file", rest, ext: this.exts[n % this.exts.length] });
+    });
+    this.IM0 = IM.slice();
+    const list = [], attachOf = new Map(this.pend.map((p) => [p.i, p.at]));
+    for (let a = 0; a < count; a++) for (let b = a + 1; b < count; b++) {
+      const aa = attachOf.has(a) ? attachOf.get(a) : null, bb = attachOf.has(b) ? attachOf.get(b) : null;
+      if (aa === null && bb === null && b - a < 3) continue;
+      if (aa === null && bb !== null && Math.abs(a - bb) < 2) continue;
+      if (bb === null && aa !== null && Math.abs(b - aa) < 2) continue;
+      list.push(a, b);
+    }
+    this.pairs = new Int32Array(list);
+    // sprites: links alternate face-on and edge-on, which reads as 3D
+    this.view.removeChildren();
+    const T = this.stage.T;
+    this.linkSprites = [];
+    for (let i = 0; i < N; i++) {
+      const tex = i % 2 === 0 ? T.link : T.edge;
+      const s = new PIXI.Sprite(tex); s.anchor.set(0.5); s.height = this.Lh; s.width = this.Lh * tex.width / tex.height;
+      this.view.addChild(s); this.linkSprites.push(s);
+    }
+    const icons = new Map();
+    for (const p of this.pend) {
+      let s;
+      if (p.kind === "lock") { s = new PIXI.Sprite(T.lock); s.height = Lp; s.width = Lp * T.lock.width / T.lock.height; }
+      else { if (!icons.has(p.ext)) icons.set(p.ext, fileIcon(p.ext)); s = new PIXI.Sprite(icons.get(p.ext)); s.width = (FILE.w + FILE.pad * 2) * Fk; s.height = (FILE.h + FILE.pad * 2) * Fk; }
+      s.anchor.set(0.5); this.view.addChild(s); p.sprite = s;
+    }
+    for (let k = 0; k < 1100; k++) this.step(DT, true);   // settle before the first frame
+  }
+
+  solveMax(a, b, rest) {
+    const { X, Y, IM } = this;
+    const dx = X[b] - X[a], dy = Y[b] - Y[a], d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= rest || d === 0) return 0;
+    const w = IM[a] + IM[b]; if (!w) return 0;
+    const f = (d - rest) / (d * w);
+    X[a] += dx * f * IM[a]; Y[a] += dy * f * IM[a]; X[b] -= dx * f * IM[b]; Y[b] -= dy * f * IM[b];
+    return d - rest;
+  }
+
+  solveMin(a, b, min) {
+    const { X, Y, IM } = this;
+    const dx = X[b] - X[a], dy = Y[b] - Y[a], d2 = dx * dx + dy * dy;
+    if (d2 >= min * min) return;
+    const d = Math.sqrt(d2) || 1e-4, w = IM[a] + IM[b]; if (!w) return;
+    const f = (min - d) / (d * w);
+    X[a] -= dx * f * IM[a]; Y[a] -= dy * f * IM[a]; X[b] += dx * f * IM[b]; Y[b] += dy * f * IM[b];
+  }
+
+  step(dt, silent) {
+    const { X, Y, PX, PY, IM, R, N, P, S, count, pairs } = this;
+    const air = Math.exp(-0.6 * dt), gg = this.g * dt * dt, W = this.stage.W, floorY = this.floorY;
+    for (let i = 0; i < count; i++) {
+      if (IM[i] === 0) continue;
+      const vx = (X[i] - PX[i]) * air, vy = (Y[i] - PY[i]) * air;
+      PX[i] = X[i]; PY[i] = Y[i]; X[i] += vx; Y[i] += vy + gg;
+    }
+    const h = this.hand();
+    PX[0] = X[0]; PY[0] = Y[0]; X[0] = h.x; Y[0] = h.y;
+    if (this.grab.i > 0) { const p = this.stage.ptr; PX[this.grab.i] = X[this.grab.i]; PY[this.grab.i] = Y[this.grab.i]; X[this.grab.i] = p.x; Y[this.grab.i] = p.y; }
+    const minAdj = P * 0.55, minSkip = 2 * P * Math.cos((120 * Math.PI / 180) / 2);
+    for (let it = 0; it < ITER; it++) {
+      if (it & 1) { for (let i = N - 1; i >= 0; i--) this.solveMax(i, i + 1, P); }
+      else { for (let i = 0; i < N; i++) { const s = this.solveMax(i, i + 1, P); if (it === 0 && s > this.snapMax) this.snapMax = s; } }
+      for (const p of this.pend) this.solveMax(p.at, p.i, p.rest);
+      for (let i = 0; i < N; i++) this.solveMin(i, i + 1, minAdj);
+      for (let i = 0; i < N - 1; i++) this.solveMin(i, i + 2, minSkip);
+    }
+    const thr = 0.55 * S * dt;
+    for (let k = 0; k < pairs.length; k += 2) {
+      const a = pairs[k], b = pairs[k + 1], rs = R[a] + R[b];
+      const dx = X[b] - X[a]; if (dx > rs || dx < -rs) continue;
+      const dy = Y[b] - Y[a]; if (dy > rs || dy < -rs) continue;
+      const d2 = dx * dx + dy * dy; if (d2 >= rs * rs) continue;
+      const w = IM[a] + IM[b]; if (!w) continue;
+      const d = Math.sqrt(d2) || 1e-4, nx = dx / d, ny = dy / d;
+      const rv = ((X[b] - PX[b]) - (X[a] - PX[a])) * nx + ((Y[b] - PY[b]) - (Y[a] - PY[a])) * ny;
+      if (!silent && rv < -thr) this.events.push({ s: (-rv / dt) / S, x: X[a] });
+      const f = (rs - d) / w;
+      X[a] -= nx * f * IM[a]; Y[a] -= ny * f * IM[a]; X[b] += nx * f * IM[b]; Y[b] += ny * f * IM[b];
+      PX[a] += (X[a] - PX[a]) * 0.03 * (IM[a] > 0); PY[a] += (Y[a] - PY[a]) * 0.03 * (IM[a] > 0);
+      PX[b] += (X[b] - PX[b]) * 0.03 * (IM[b] > 0); PY[b] += (Y[b] - PY[b]) * 0.03 * (IM[b] > 0);
+    }
+    const mu = 0.55 * this.g * dt * dt;
+    for (let i = 1; i < count; i++) {
+      if (IM[i] === 0) continue;
+      const r = R[i], lim = floorY - r;
+      if (Y[i] >= lim) {
+        const vy = Y[i] - PY[i];
+        if (!silent && vy > thr) this.events.push({ s: (vy / dt) / S, x: X[i] });
+        Y[i] = lim; PY[i] = lim + vy * 0.1;
+        const vx = X[i] - PX[i];
+        if (Math.abs(vx) <= mu) PX[i] = X[i]; else PX[i] = X[i] - (vx - Math.sign(vx) * mu);
+        this.slide += Math.abs(vx) / dt / S;
+      }
+      if (X[i] < r) { const vx = X[i] - PX[i]; X[i] = r; PX[i] = r + vx * 0.3; }
+      else if (X[i] > W - r) { const vx = X[i] - PX[i]; X[i] = W - r; PX[i] = W - r + vx * 0.3; }
+    }
+  }
+
+  update(dt) {
+    this.acc += dt;
+    let steps = Math.floor(this.acc / DT);
+    if (steps > 24) { steps = 24; this.acc = 0; } else this.acc -= steps * DT;
+    this.snapMax = 0; this.slide = 0;
+    for (let s = 0; s < steps; s++) this.step(DT, false);
+    this.slide /= Math.max(1, steps);
+    // a taut chain tugs him along when you pull it
+    if (this.grab.i > 0) {
+      const h = this.hand(), i = this.grab.i, dx = this.X[i] - h.x, dy = this.Y[i] - h.y, d = Math.hypot(dx, dy);
+      if (d > this.grab.len) { const f = (d - this.grab.len) * 55; this.puppet.M.vx += dx / d * f * dt; this.puppet.M.vy += dy / d * f * dt; }
+    }
+    this.draw();
+    this.sounds();
+  }
+
+  draw() {
+    const { X, Y, N } = this, half = Math.PI / 2;
+    for (let i = 0; i < N; i++) {
+      const s = this.linkSprites[i];
+      s.position.set((X[i] + X[i + 1]) / 2, (Y[i] + Y[i + 1]) / 2);
+      s.rotation = Math.atan2(Y[i + 1] - Y[i], X[i + 1] - X[i]) - half;
+    }
+    for (const p of this.pend) {
+      p.sprite.position.set(X[p.i], Y[p.i]);
+      p.sprite.rotation = Math.atan2(Y[p.i] - Y[p.at], X[p.i] - X[p.at]) - half;
+    }
+    this.view.alpha = this.puppet.s.alpha;
+  }
+
+  sounds() {
+    const snd = this.sound;
+    if (!snd || this.view.alpha < 0.2) { this.events.length = 0; return; }
+    if (this.snapMax > this.P * 0.06) this.events.push({ s: Math.min(1.5, this.snapMax / this.P * 4), x: this.X[0] });
+    this.events.sort((a, b) => b.s - a.s);
+    let played = 0;
+    const now = performance.now();
+    for (const ev of this.events) {
+      if (played >= 3) break;
+      const s = Math.min(1, (ev.s - 0.5) / 3.5); if (s <= 0) break;
+      if (now - (this.lastClink || 0) < 24 && played > 0) break;
+      snd.clink(s * 0.8, (ev.x / this.stage.W) * 2 - 1); this.lastClink = now; played++;
+    }
+    this.events.length = 0;
+    snd.scrape(Math.min(0.22, this.slide * 0.004));
+  }
+
+  /** The nearest link or pendant to (x, y), within reach; -1 if none. */
+  hit(x, y) {
+    let best = -1, bd = Math.max(26, this.Lh * 1.4) ** 2;
+    for (let i = 1; i < this.count; i++) { const d = (this.X[i] - x) ** 2 + (this.Y[i] - y) ** 2; if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+
+  take(i) {
+    const pe = this.pend.find((q) => q.i === i);
+    this.grab.len = pe ? pe.at * this.P + pe.rest : i * this.P;
+    this.grab.i = i; this.IM[i] = 0;
+  }
+
+  drop() {
+    if (this.grab.i > 0) this.IM[this.grab.i] = this.IM0[this.grab.i];
+    this.grab.i = -1;
+  }
+
+  remove() {
+    this.off();
+    this.sound?.scrape(0);
+    this.stage.sys.world.removeChild(this.view);
+    this.view.destroy({ children: true });
+  }
+}
