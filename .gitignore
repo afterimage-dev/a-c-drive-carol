@@ -1,0 +1,8 @@
+node_modules/
+docs/
+dist/
+out/
+assets/sprites/_grids/
+assets/sprites/_tmp/
+*.log
+__pycache__/

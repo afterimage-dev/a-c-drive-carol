@@ -1,0 +1,50 @@
+{
+  "_about": "Hand-measured points on each cut-out sprite, in that sprite's own pixels (origin top-left). The animation code bends each image around these. If you regenerate or re-crop the art, re-measure them (tools/prepare_sprites.py --grid writes grid overlays to help).",
+  "marlware": {
+    "sprite": "marl_body.webp", "original": "marl_orig.webp", "size": [398, 705],
+    "eyes": [[115, 204], [211, 202]], "eyeRadius": [17, 19], "eyePaintRadius": [21, 24], "eyeColour": "cyan",
+    "mouth": { "at": [160, 250], "width": 34, "tint": "0x223049" },
+    "neck": [171, 289],
+    "hands": [[58, 504], [298, 485]],
+    "chainHand": [298, 485],
+    "_chainHandNote": "In the 520px-tall chain-demo sprite (marlware.webp, 294x520) the chain hand is +0.140, +0.192 sprite heights from the centre."
+  },
+  "past": {
+    "sprite": "past_body.webp", "original": "past_orig.webp", "size": [369, 661],
+    "eyes": [[110, 165], [195, 165]], "eyeRadius": [16, 15], "eyePaintRadius": [21, 20], "eyeColour": "ember",
+    "mouth": { "at": [152, 211], "width": 40, "tint": "0x40384e" },
+    "neck": [160, 248],
+    "hands": [[46, 419], [281, 424]],
+    "haloAnchor": [166, 22], "_haloNote": "Loading-bar halo drawn 48px above this point, 150 x 20 px, 14 segments."
+  },
+  "present": {
+    "sprite": "present_body.webp", "original": "present_orig.webp", "size": [614, 697],
+    "eyes": [[297, 151], [347, 151]], "eyeRadius": [11, 8], "eyePaintRadius": [14, 10], "eyeColour": "gold",
+    "mouth": { "at": [317, 196], "width": 46, "tint": "0x3b3440" },
+    "neck": [321, 258],
+    "hands": [[112, 337], [501, 494]],
+    "belly": { "at": [292, 407], "radius": 120 },
+    "magnifierLens": { "at": [59, 213], "radius": 37 }
+  },
+  "yetToCome": {
+    "sprite": "yet_body.webp", "size": [629, 711], "cutout": "solid (dark robe must stay opaque)",
+    "neck": [275, 197],
+    "hands": [[380, 432]],
+    "pointingHand": [52, 406], "_pointingNote": "Points to the viewer's left; put the gravestone under it.",
+    "hoodCentre": [256, 108], "_hoodNote": "Two faint pinprick eyes appear 15px either side of here on the second question."
+  },
+  "gravestone": {
+    "sprite": "stone.webp", "size": [500, 462],
+    "panelCentre": [266, 150], "panelAngleRadians": 0.125,
+    "inscription": [
+      { "text": "HERE LIES C:", "offsetY": -46, "size": 24, "alpha": 1 },
+      { "text": "FULL · {MONTH YEAR}", "offsetY": -6, "size": 17, "alpha": 1 },
+      { "text": "OR · {MONTH YEAR}", "offsetY": 34, "size": 15, "alpha": 0.6 }
+    ],
+    "_note": "Cracks run across the panel. Either regenerate with a smooth central panel, or let the cracks appear after the carving."
+  },
+  "chain": {
+    "linkFace": "link.webp", "linkEdge": "edge.webp", "padlock": "padlock.webp",
+    "linkPitchOfHeight": 0.62, "linkHeightOfMarlware": 0.09, "padlockHeightOfLink": 1.75
+  }
+}

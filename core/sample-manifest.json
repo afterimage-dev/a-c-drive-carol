@@ -1,0 +1,440 @@
+{
+  "_about": "The demo night. Every file here is created a few bytes long; sizes, dates and history are simulated. Ages are relative ('days' ago, at a clock time), so the sample always feels current. 'weekday' nudges the date to that day of the week.",
+  "drive": {
+    "total": 549755813888,
+    "free": 6871947674,
+    "growthPerMonth": 805306368
+  },
+  "files": [
+    {
+      "id": "vlc",
+      "path": "Downloads/vlc-3.0.20-win64.exe",
+      "kind": "installer",
+      "size": 44040192,
+      "ago": {
+        "days": 426,
+        "at": "21:37"
+      },
+      "opened": null,
+      "origin": {
+        "site": "videolan.org",
+        "url": "https://get.videolan.org/vlc/3.0.20/win64/vlc-3.0.20-win64.exe"
+      },
+      "installer": {
+        "product": "VLC media player",
+        "version": "3.0.20",
+        "installed": {
+          "version": "3.0.21",
+          "daysAgo": 400
+        }
+      }
+    },
+    {
+      "id": "steam",
+      "path": "Downloads/SteamSetup.exe",
+      "kind": "installer",
+      "size": 2411724,
+      "ago": {
+        "days": 610,
+        "at": "18:05"
+      },
+      "opened": {
+        "days": 610
+      },
+      "origin": {
+        "site": "steampowered.com",
+        "url": "https://cdn.cloudflare.steamstatic.com/client/installer/SteamSetup.exe"
+      },
+      "installer": {
+        "product": "Steam",
+        "version": "2.10.91.91",
+        "installed": {
+          "version": "2.10.91.91",
+          "daysAgo": 609
+        }
+      }
+    },
+    {
+      "id": "gimp",
+      "path": "Downloads/gimp-2.10.38-setup.exe",
+      "kind": "installer",
+      "size": 325058560,
+      "ago": {
+        "days": 233,
+        "at": "23:50"
+      },
+      "opened": null,
+      "origin": {
+        "site": "gimp.org",
+        "url": "https://download.gimp.org/gimp/v2.10/windows/gimp-2.10.38-setup.exe"
+      },
+      "installer": {
+        "product": "GIMP",
+        "version": "2.10.38",
+        "installed": null
+      }
+    },
+    {
+      "id": "node",
+      "path": "Desktop/node-v20.11.0-x64.msi",
+      "kind": "installer",
+      "size": 28311552,
+      "ago": {
+        "days": 265,
+        "at": "10:12"
+      },
+      "opened": {
+        "days": 265
+      },
+      "origin": {
+        "site": "nodejs.org",
+        "url": "https://nodejs.org/dist/v20.11.0/node-v20.11.0-x64.msi"
+      },
+      "installer": {
+        "product": "Node.js",
+        "version": "20.11.0",
+        "installed": {
+          "version": "22.11.0",
+          "daysAgo": 60
+        }
+      }
+    },
+    {
+      "id": "invoice",
+      "path": "Downloads/invoice_march (3).pdf",
+      "kind": "document",
+      "size": 184320,
+      "ago": {
+        "days": 731,
+        "at": "02:14",
+        "weekday": "Tuesday"
+      },
+      "opened": {
+        "days": 731
+      },
+      "origin": {
+        "site": "mail.google.com",
+        "url": "https://mail.google.com/"
+      }
+    },
+    {
+      "id": "ubuntu",
+      "path": "Downloads/ubuntu-24.04-desktop-amd64.iso",
+      "kind": "diskImage",
+      "size": 6227702579,
+      "ago": {
+        "days": 580,
+        "at": "19:40"
+      },
+      "opened": null,
+      "origin": {
+        "site": "ubuntu.com",
+        "url": "https://releases.ubuntu.com/24.04/ubuntu-24.04-desktop-amd64.iso"
+      }
+    },
+    {
+      "id": "wedding",
+      "path": "Downloads/wedding_photos_final.zip",
+      "kind": "archive",
+      "size": 671088640,
+      "ago": {
+        "days": 248,
+        "at": "13:20"
+      },
+      "opened": null,
+      "origin": {
+        "site": "wetransfer.com",
+        "url": "https://wetransfer.com/downloads/"
+      }
+    },
+    {
+      "id": "budget",
+      "path": "Downloads/Q3_budget_v7_FINAL.xlsx",
+      "kind": "spreadsheet",
+      "size": 98304,
+      "ago": {
+        "days": 1120,
+        "at": "15:42"
+      },
+      "opened": {
+        "days": 1118
+      },
+      "origin": {
+        "site": "outlook.office.com",
+        "url": "https://outlook.office.com/mail/"
+      }
+    },
+    {
+      "id": "lofi",
+      "path": "Desktop/lofi_study_mix.mp3",
+      "kind": "audio",
+      "size": 81788928,
+      "ago": {
+        "days": 330,
+        "at": "22:10"
+      },
+      "opened": {
+        "days": 329
+      },
+      "origin": null
+    },
+    {
+      "id": "photo",
+      "path": "Downloads/IMG_4471_edit.jpg",
+      "kind": "image",
+      "size": 3565158,
+      "ago": {
+        "days": 690,
+        "at": "20:05"
+      },
+      "opened": {
+        "days": 690
+      },
+      "origin": {
+        "site": "photos.google.com",
+        "url": "https://photos.google.com/"
+      }
+    },
+    {
+      "id": "paper",
+      "path": "Downloads/attention_is_all_you_need.pdf",
+      "kind": "document",
+      "size": 2202010,
+      "ago": {
+        "days": 512,
+        "at": "07:15"
+      },
+      "opened": {
+        "days": 511
+      },
+      "origin": {
+        "site": "arxiv.org",
+        "url": "https://arxiv.org/pdf/1706.03762"
+      }
+    },
+    {
+      "id": "drive1",
+      "path": "Downloads/drive-download-20250301.zip",
+      "kind": "archive",
+      "size": 15728640,
+      "ago": {
+        "days": 205,
+        "at": "14:02"
+      },
+      "opened": {
+        "days": 205
+      },
+      "origin": {
+        "site": "drive.google.com",
+        "url": "https://drive.google.com/"
+      }
+    },
+    {
+      "id": "drive2",
+      "path": "Downloads/slides_final.pptx",
+      "kind": "document",
+      "size": 9437184,
+      "ago": {
+        "days": 198,
+        "at": "16:48"
+      },
+      "opened": {
+        "days": 198
+      },
+      "origin": {
+        "site": "drive.google.com",
+        "url": "https://drive.google.com/"
+      }
+    },
+    {
+      "id": "drive3",
+      "path": "Downloads/notes_export.zip",
+      "kind": "archive",
+      "size": 1048576,
+      "ago": {
+        "days": 150,
+        "at": "11:30"
+      },
+      "opened": {
+        "days": 150
+      },
+      "origin": {
+        "site": "drive.google.com",
+        "url": "https://drive.google.com/"
+      }
+    },
+    {
+      "id": "resume",
+      "path": "Desktop/old_resume_2021.docx",
+      "kind": "document",
+      "size": 65536,
+      "ago": {
+        "days": 900,
+        "at": "16:00"
+      },
+      "opened": {
+        "days": 880
+      },
+      "timesBanished": 2,
+      "origin": {
+        "site": "linkedin.com",
+        "url": "https://www.linkedin.com/"
+      }
+    },
+    {
+      "id": "recording",
+      "path": "Desktop/screen-recording-0203.mp4",
+      "kind": "video",
+      "size": 641728512,
+      "ago": {
+        "days": 300,
+        "at": "17:30"
+      },
+      "opened": {
+        "days": 290
+      },
+      "origin": null
+    },
+    {
+      "id": "boarding",
+      "path": "Downloads/boarding_pass.pdf",
+      "kind": "document",
+      "size": 122880,
+      "ago": {
+        "days": 2,
+        "at": "08:40"
+      },
+      "opened": {
+        "days": 1
+      },
+      "origin": {
+        "site": "britishairways.com",
+        "url": "https://www.britishairways.com/"
+      },
+      "_note": "Too recent to haunt. Shows the spirits leave new files alone."
+    },
+    {
+      "id": "rep1",
+      "path": "Documents/Reports/report.pdf",
+      "kind": "document",
+      "size": 2516582,
+      "same": "report",
+      "ago": {
+        "days": 500,
+        "at": "11:00"
+      },
+      "opened": {
+        "days": 480
+      },
+      "origin": null
+    },
+    {
+      "id": "rep2",
+      "path": "Downloads/report (1).pdf",
+      "kind": "document",
+      "size": 2516582,
+      "same": "report",
+      "ago": {
+        "days": 500,
+        "at": "11:04"
+      },
+      "opened": null,
+      "origin": {
+        "site": "mail.google.com",
+        "url": "https://mail.google.com/"
+      }
+    },
+    {
+      "id": "rep3",
+      "path": "Desktop/Copy of report.pdf",
+      "kind": "document",
+      "size": 2516582,
+      "same": "report",
+      "ago": {
+        "days": 420,
+        "at": "09:30"
+      },
+      "opened": {
+        "days": 30
+      },
+      "origin": null
+    },
+    {
+      "id": "img1",
+      "path": "Downloads/IMG_4471.jpg",
+      "kind": "image",
+      "size": 5033164,
+      "same": "photo",
+      "ago": {
+        "days": 380,
+        "at": "20:11"
+      },
+      "opened": {
+        "days": 380
+      },
+      "origin": {
+        "site": "photos.google.com",
+        "url": "https://photos.google.com/"
+      }
+    },
+    {
+      "id": "img2",
+      "path": "Downloads/IMG_4471 (1).jpg",
+      "kind": "image",
+      "size": 5033164,
+      "same": "photo",
+      "ago": {
+        "days": 380,
+        "at": "20:12"
+      },
+      "opened": null,
+      "origin": {
+        "site": "photos.google.com",
+        "url": "https://photos.google.com/"
+      }
+    },
+    {
+      "id": "img3",
+      "path": "Documents/Photos/IMG_4471.jpg",
+      "kind": "image",
+      "size": 5033164,
+      "same": "photo",
+      "ago": {
+        "days": 379,
+        "at": "09:02"
+      },
+      "opened": {
+        "days": 200
+      },
+      "origin": null
+    },
+    {
+      "id": "set1",
+      "path": "Downloads/setup_final.exe",
+      "kind": "other",
+      "size": 18874368,
+      "same": "setup",
+      "ago": {
+        "days": 140,
+        "at": "12:20"
+      },
+      "opened": {
+        "days": 140
+      },
+      "origin": null
+    },
+    {
+      "id": "set2",
+      "path": "Downloads/setup_final (2).exe",
+      "kind": "other",
+      "size": 18874368,
+      "same": "setup",
+      "ago": {
+        "days": 139,
+        "at": "12:21"
+      },
+      "opened": null,
+      "origin": null
+    }
+  ]
+}

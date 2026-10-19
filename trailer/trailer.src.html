@@ -1,0 +1,765 @@
+<title>A C-Drive Carol Trailer</title>
+<style>
+/* Layout: a cinema screen and a slim transport bar beneath it. Single dark world by design. */
+:root { color-scheme: dark; --void: #050408; --ink: #e9e6f5; --dim: #948fae; --spectre: #8ff0ee; --rule: #2a2640;
+  --mono: "JBMono", ui-monospace, Consolas, monospace; --body: "Atkinson", system-ui, sans-serif; --display: "Fell", Georgia, serif; }
+html, body { background: var(--void); color: var(--ink); }
+body { font-family: var(--body); margin: 0 auto; max-width: 1280px; padding-inline: 16px; padding-block: 16px 28px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-block-end: 10px; }
+.head h1 { font-family: var(--display); font-weight: 400; font-size: clamp(1.4rem, 4vw, 2rem); margin: 0; }
+.head p { margin: 0; color: var(--dim); font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+.screen { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: #000; border-radius: 10px; overflow: hidden; border: 1px solid var(--rule); }
+.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.play { position: absolute; left: 50%; top: 50%; translate: -50% -50%; font-family: var(--mono); font-size: 14px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink); background: rgba(5, 4, 8, .72); border: 1px solid rgba(143, 240, 238, .5); border-radius: 999px; padding: 14px 26px; cursor: pointer; }
+.play:hover { border-color: var(--spectre); color: var(--spectre); }
+.play:focus-visible, .bar button:focus-visible, .bar input:focus-visible { outline: 2px solid var(--spectre); outline-offset: 2px; }
+.bar { display: flex; align-items: center; gap: 12px; margin-block-start: 10px; }
+.bar button { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; color: var(--ink); background: transparent; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+.bar input { flex: 1; min-width: 0; accent-color: var(--spectre); }
+.bar output { font-family: var(--mono); font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.note { color: var(--dim); font-size: 13px; margin: 10px 0 0; }
+.err { color: #ffb3c7; font-family: var(--mono); font-size: 12px; }
+</style>
+
+<div class="head"><h1>A C-Drive Carol</h1><p>Trailer · 1:51 · sound on</p></div>
+<div class="screen" id="screen">
+  <canvas id="out" role="img" aria-label="Trailer for A C-Drive Carol: a haunted desktop, the ghost of Jacob Marlware, three spirits, and a gravestone for a hard drive"></canvas>
+  <button class="play" id="play" type="button">Play trailer</button>
+</div>
+<div class="bar">
+  <button id="toggle" type="button">Play</button>
+  <input id="scrub" type="range" min="0" max="110.8" step="0.01" value="97.3" aria-label="Position in the trailer">
+  <output id="clock">1:37</output>
+</div>
+<p class="note">Made with the app's own art, fonts and animation code. Flashing images and a loud moment at 1:21.</p>
+
+<script src="__PIXI__"></script>
+<script>__LIB__</script>
+<script>
+(async function () {
+  const MODE = "__MODE__";                 // "live" (player page) or "render" (frame capture)
+  const TL = __TIMELINE__, A = __ASSETS__, FONTS = __FONTS__, AUDIO = "__AUDIO__";
+  const W = 1920, H = 1080, FPS = TL.fps, DUR = TL.duration;
+  const screenEl = document.getElementById("screen");
+  if (!window.PIXI) { screenEl.insertAdjacentHTML("beforeend", '<p class="err" style="position:absolute;left:12px;top:8px">The animation library could not load. Check your connection and reload.</p>'); return; }
+
+  // ---------- fonts ----------
+  await Promise.all(FONTS.map(async (f) => { try { const ff = new FontFace(f.family, `url(${f.src})`, { style: f.style, weight: f.weight }); await ff.load(); document.fonts.add(ff); } catch (e) {} }));
+
+  // ---------- helpers ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const ease = (k) => (k = clamp(k), k * k * (3 - 2 * k));
+  const easeOut = (k) => 1 - Math.pow(1 - clamp(k), 3);
+  const easeIn = (k) => Math.pow(clamp(k), 3);
+  const prog = (t, a, b) => clamp((t - a) / (b - a));
+  const bell = (x, c, w) => Math.exp(-((x - c) * (x - c)) / (2 * w * w));
+  function hash(a, b = 0) { let h = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b | 0) + 0x632be59b, 0xc2b2ae35); h ^= h >>> 13; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+  function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) | 0; let x = Math.imul(s ^ (s >>> 15), 1 | s); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; }; }
+  const shotAt = (t) => TL.shots.find((s) => t >= s.start && t < s.end) || TL.shots[TL.shots.length - 1];
+  const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+
+  // ---------- canvases ----------
+  const out = document.getElementById("out");
+  let Q = 1;
+  function pickQ() { if (MODE === "render") return 1; const w = screenEl.clientWidth * Math.min(2, devicePixelRatio || 1); return clamp(w / W, 0.5, 1); }
+  Q = pickQ();
+  out.width = Math.round(W * Q); out.height = Math.round(H * Q);
+  const ctx = out.getContext("2d");
+  const mk = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; };
+  const tmp = mk(out.width, out.height), tctx = tmp.getContext("2d");
+  const tint = mk(out.width, out.height), nctx = tint.getContext("2d");
+
+  // ---------- images ----------
+  const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  const IMG = {};
+  await Promise.all(Object.entries(A).filter(([k, v]) => typeof v === "string").map(async ([k, v]) => { IMG[k] = await loadImg(v); }));
+
+  // ---------- PixiJS (spirits, gravestone, chain) ----------
+  const app = new PIXI.Application({ width: out.width, height: out.height, backgroundAlpha: 0, antialias: true, preserveDrawingBuffer: true, autoStart: false, resolution: 1 });
+  app.ticker.stop();
+  const world = new PIXI.Container(); app.stage.addChild(world);
+  const stoneLayer = new PIXI.Container(), fxLayer = new PIXI.Container();
+  world.addChild(stoneLayer);
+  const T = {}; for (const k in IMG) T[k] = PIXI.Texture.from(IMG[k]);
+  const sys = CarolPhosphor.create(app, T, { W: out.width, H: out.height, cell: 3 * Q, spawn: { marl: A.marl_spawn, past: A.past_spawn, present: A.present_spawn, yet: A.yet_spawn }, twins: true });
+  app.stage.addChild(sys.output);
+  sys.world.addChild(fxLayer);
+  const spiritLayer = sys.spirits;
+  function softTex(stops) { const c = mk(128, 128), g = c.getContext("2d"), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); stops.forEach(([o, col]) => gr.addColorStop(o, col)); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return PIXI.Texture.from(c); }
+  const EYE = {
+    cyan: { socket: softTex([[0, "rgba(16,22,40,.75)"], [0.75, "rgba(16,22,40,.55)"], [1, "rgba(16,22,40,0)"]]), halo: softTex([[0, "rgba(143,240,238,.55)"], [0.4, "rgba(143,240,238,.18)"], [1, "rgba(143,240,238,0)"]]), disc: softTex([[0, "#f2fffe"], [0.55, "#c4faf8"], [0.82, "#8ff0ee"], [1, "rgba(143,240,238,0)"]]) },
+    ember: { socket: softTex([[0, "rgba(30,24,40,.7)"], [0.75, "rgba(30,24,40,.5)"], [1, "rgba(30,24,40,0)"]]), halo: softTex([[0, "rgba(255,206,150,.55)"], [0.4, "rgba(255,196,140,.18)"], [1, "rgba(255,190,130,0)"]]), disc: softTex([[0, "#fffaf0"], [0.55, "#ffe6c2"], [0.82, "#ffc98e"], [1, "rgba(255,200,140,0)"]]) },
+    gold: { socket: softTex([[0, "rgba(28,26,36,.6)"], [0.75, "rgba(28,26,36,.45)"], [1, "rgba(28,26,36,0)"]]), halo: softTex([[0, "rgba(255,236,170,.55)"], [0.4, "rgba(255,230,160,.2)"], [1, "rgba(255,230,160,0)"]]), disc: softTex([[0, "#fffef6"], [0.55, "#fff3c8"], [0.82, "#ffe39a"], [1, "rgba(255,227,154,0)"]]) },
+    core: softTex([[0, "rgba(255,255,255,1)"], [0.6, "rgba(255,255,255,.7)"], [1, "rgba(255,255,255,0)"]]),
+    pin: softTex([[0, "rgba(220,240,255,1)"], [0.3, "rgba(160,200,255,.6)"], [1, "rgba(120,160,255,0)"]]),
+    mouth: softTex([[0, "rgba(255,255,255,1)"], [0.5, "rgba(255,255,255,.8)"], [1, "rgba(255,255,255,0)"]])
+  };
+
+  const SP = { marl: sys.spirit("marl"), past: sys.spirit("past"), present: sys.spirit("present"), yet: sys.spirit("yet") };
+  for (const k in SP) SP[k].root.__sp = SP[k];
+
+  // the gravestone, with its inscription carved in Cinzel
+  const stone = new PIXI.Container();
+  const stoneSprite = new PIXI.Sprite(T.stone); stoneSprite.anchor.set(0.5, 1); stone.addChild(stoneSprite);
+  const carve = new PIXI.Container(); carve.rotation = 0.125; carve.position.set(266 - 250, 150 - 462); stone.addChild(carve);
+  const carveStyle = (size, alpha) => new PIXI.TextStyle({ fontFamily: "Cinzel", fontWeight: "700", fontSize: size, fill: "#1a2133", letterSpacing: 1, dropShadow: true, dropShadowColor: "#e6fbff", dropShadowAlpha: 0.55 * alpha, dropShadowBlur: 0, dropShadowAngle: Math.PI / 2, dropShadowDistance: 1.5 });
+  const CARVE = [{ text: "HERE LIES C:", y: -46, size: 24 }, { text: "FULL · JUNE 2027", y: -6, size: 17 }];
+  CARVE.forEach((l) => { l.tx = new PIXI.Text("", carveStyle(l.size, 1)); l.tx.anchor.set(0.5); l.tx.y = l.y; carve.addChild(l.tx); });
+  stoneLayer.addChild(stone);
+
+  // chain links (Marlware's coil, the strobe, the last frame)
+  const linkSprites = [];
+  function linkSprite(i) { while (linkSprites.length <= i) { const s = new PIXI.Sprite(linkSprites.length % 2 ? T.edge : T.link); s.anchor.set(0.5); fxLayer.addChild(s); linkSprites.push(s); } return linkSprites[i]; }
+  function hideLinks(from = 0) { for (let i = from; i < linkSprites.length; i++) linkSprites[i].visible = false; }
+
+  // ---------- 2D drawing helpers ----------
+  const F = { fell: "Fell", fellI: "Fell", cinzel: "Cinzel", corm: "Cormorant", abril: "Abril", mono: "JBMono", plex: "Plex", atk: "Atkinson" };
+  function setFont(c, px, fam, style = "normal", weight = "400") { c.font = `${style} ${weight} ${px}px "${fam}"`; }
+  function wrapLines(c, text, maxW) {
+    const words = text.split(" "), lines = []; let line = "";
+    for (const w of words) { const test = line ? line + " " + w : w; if (c.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test; }
+    if (line) lines.push(line); return lines;
+  }
+  const GLYPHS = "#%&@$*/";
+  function typed(c, text, x, y, { maxW = 1200, lh = 1.3, px = 40, n = 1e9, glitchSeed = -1, align = "left" } = {}) {
+    const lines = wrapLines(c, text, maxW); let left = Math.floor(n);
+    c.textAlign = align; c.textBaseline = "alphabetic";
+    lines.forEach((ln, i) => {
+      let shown = ln.slice(0, Math.max(0, left));
+      if (glitchSeed >= 0 && left > 0 && left < ln.length && hash(glitchSeed, i) < 0.35) shown += GLYPHS[(hash(glitchSeed, i + 9) * GLYPHS.length) | 0];
+      c.fillText(shown, x, y + i * px * lh); left -= ln.length + 1;
+    });
+    return lines.length;
+  }
+  // per-word reveal: "surface" (fade + blur, Past) or "pop" (scale bounce, Present)
+  function words(c, text, x, y, { maxW = 1200, lh = 1.25, px = 40, shown = 1e9, mode = "surface", align = "left", t = 0 } = {}) {
+    const lines = wrapLines(c, text, maxW); let idx = 0;
+    c.textBaseline = "alphabetic"; c.textAlign = "left";
+    const space = c.measureText(" ").width;
+    lines.forEach((ln, li) => {
+      const ws = ln.split(" "); const total = c.measureText(ln).width;
+      let cx = align === "center" ? x - total / 2 : x; const cy = y + li * px * lh;
+      ws.forEach((w) => {
+        const k = clamp(shown - idx), wW = c.measureText(w).width;
+        if (k > 0) {
+          c.save();
+          if (mode === "surface") { c.globalAlpha *= k; const b = (1 - k) * 6; if (b > 0.2) c.filter = `blur(${b.toFixed(1)}px)`; c.fillText(w, cx, cy); }
+          else { const c1 = 1.70158, c3 = c1 + 1, q = k - 1; const s = k >= 1 ? 1 : 0.35 + 0.65 * (1 + c3 * q * q * q + c1 * q * q); c.globalAlpha *= clamp(k * 3); c.translate(cx + wW / 2, cy - px * 0.35); c.scale(s, s); c.fillText(w, -wW / 2, px * 0.35); }
+          c.restore();
+        }
+        cx += wW + space; idx++;
+      });
+    });
+  }
+  function panel(c, x, y, w, h, border = "rgba(143,240,238,.35)", fill = "rgba(9,8,15,.86)") {
+    c.save(); c.beginPath(); c.roundRect(x, y, w, h, 14); c.fillStyle = fill; c.fill(); c.lineWidth = 2; c.strokeStyle = border; c.stroke(); c.restore();
+  }
+  function fileIcon(c, x, y, s, ext, col) {
+    // a generic document icon with a coloured band and the extension
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(36, 0); c.lineTo(52, 16); c.lineTo(52, 66); c.lineTo(0, 66); c.closePath();
+    c.fillStyle = "#eef2f7"; c.fill(); c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = 1.5; c.stroke();
+    c.beginPath(); c.moveTo(36, 0); c.lineTo(36, 16); c.lineTo(52, 16); c.fillStyle = "#cfd6df"; c.fill();
+    c.fillStyle = col; c.fillRect(0, 40, 52, 18);
+    setFont(c, 11, F.mono, "normal", "600"); c.fillStyle = "#fff"; c.textAlign = "center"; c.fillText(ext.toUpperCase(), 26, 53);
+    c.restore();
+  }
+  function folderIcon(c, x, y, s) {
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.fillStyle = "#e8b64c"; c.beginPath(); c.roundRect(0, 6, 64, 50, 5); c.fill();
+    c.fillStyle = "#d9a336"; c.beginPath(); c.roundRect(0, 0, 26, 14, 4); c.fill();
+    c.fillStyle = "#f3c968"; c.beginPath(); c.roundRect(0, 16, 64, 40, 5); c.fill();
+    c.restore();
+  }
+  function cursor(c, x, y, s = 1, alpha = 1, tintCol = null) {
+    c.save(); c.globalAlpha *= alpha; c.translate(x, y); c.scale(s * 2.2, s * 2.2);
+    c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 17); c.lineTo(4, 13); c.lineTo(7, 20); c.lineTo(10, 19); c.lineTo(7, 12); c.lineTo(12, 12); c.closePath();
+    c.fillStyle = tintCol || "#ffffff"; c.fill(); c.lineWidth = 1.2; c.strokeStyle = "#000"; c.stroke(); c.restore();
+  }
+
+  function drawCrypt(c, cx, base, k, glow) {
+    const R = 190, r = 118, top = base - 300;
+    c.save(); c.globalAlpha *= k;
+    const g = c.createLinearGradient(0, top, 0, base); g.addColorStop(0, "#2c2a38"); g.addColorStop(1, "#15141c");
+    c.beginPath(); c.moveTo(cx - R, base); c.lineTo(cx - R, top + R); c.arc(cx, top + R, R, Math.PI, 0); c.lineTo(cx + R, base); c.closePath();
+    c.fillStyle = g; c.fill(); c.lineWidth = 3; c.strokeStyle = `rgba(143,240,238,${0.3 + 0.5 * glow})`; c.stroke();
+    c.beginPath(); c.moveTo(cx - r, base); c.lineTo(cx - r, top + R); c.arc(cx, top + R, r, Math.PI, 0); c.lineTo(cx + r, base); c.closePath();
+    const dg = c.createRadialGradient(cx, base - 50, 10, cx, base - 70, 260); dg.addColorStop(0, `rgba(143,240,238,${0.08 + 0.8 * glow})`); dg.addColorStop(0.5, `rgba(40,70,90,${0.15 + 0.35 * glow})`); dg.addColorStop(1, "#040408");
+    c.fillStyle = dg; c.fill(); c.strokeStyle = "rgba(0,0,0,.6)"; c.lineWidth = 4; c.stroke();
+    setFont(c, 22, F.cinzel, "normal", "700"); c.letterSpacing = "6px"; c.textAlign = "center";
+    c.fillStyle = "#0b0b11"; c.fillText("THE CRYPT", cx + 3, top + 56); c.fillStyle = "rgba(205,240,245,.6)"; c.fillText("THE CRYPT", cx + 3, top + 54.5); c.letterSpacing = "0px";
+    c.restore();
+  }
+
+  // ---------- the desktop ----------
+  const ICONS = [
+    { name: "Downloads", folder: true, col: 0, row: 0 },
+    { name: "invoice_march (3).pdf", ext: "pdf", c: "#d64545", col: 0, row: 1 },
+    { name: "report (1).pdf", ext: "pdf", c: "#d64545", col: 0, row: 2 },
+    { name: "Copy of report.pdf", ext: "pdf", c: "#d64545", col: 0, row: 3 },
+    { name: "vlc-3.0.20-win64.exe", ext: "exe", c: "#e07b1f", col: 0, row: 4 },
+    { name: "ubuntu-24.04-desktop-amd64.iso", ext: "iso", c: "#6b7280", col: 1, row: 0 },
+    { name: "old_resume_2021.docx", ext: "docx", c: "#2f6fd6", col: 1, row: 1 },
+    { name: "IMG_4471 (1).jpg", ext: "jpg", c: "#2aa876", col: 1, row: 2 },
+    { name: "setup_final (2).exe", ext: "exe", c: "#e07b1f", col: 1, row: 3 },
+    { name: "wedding_photos_final.zip", ext: "zip", c: "#c99a1e", col: 1, row: 4 }
+  ];
+  const iconPos = (ic) => ({ x: 150 + ic.col * 160, y: 150 + ic.row * 158 });
+  const iconCentre = (i) => { const p = iconPos(ICONS[i]); return { x: p.x + 70, y: p.y + 44 }; };
+  function drawIconCell(c, ic, { alpha = 1, label = null, selected = false, labelCol = "#fff" } = {}) {
+    const p = iconPos(ic);
+    c.save(); c.globalAlpha *= alpha;
+    if (selected) { c.fillStyle = "rgba(120,170,255,.22)"; c.strokeStyle = "rgba(150,190,255,.6)"; c.lineWidth = 1.5; c.beginPath(); c.roundRect(p.x, p.y - 6, 140, 150, 6); c.fill(); c.stroke(); }
+    if (ic.folder) folderIcon(c, p.x + 38, p.y + 14, 1); else fileIcon(c, p.x + 44, p.y + 6, 1, ic.ext, ic.c);
+    setFont(c, 17, F.atk); c.fillStyle = labelCol; c.textAlign = "center"; c.shadowColor = "rgba(0,0,0,.9)"; c.shadowBlur = 4;
+    const lines = wrapLines(c, label || ic.name, 136).slice(0, 2);
+    lines.forEach((ln, i) => c.fillText(ln, p.x + 70, p.y + 104 + i * 21));
+    c.restore();
+  }
+  const desk = mk(W, H), dctx = desk.getContext("2d");
+  (function paintDesk() {
+    const c = dctx;
+    const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0, "#0b1430"); g.addColorStop(1, "#05070f"); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    const blob = (x, y, r, col) => { const rg = c.createRadialGradient(x, y, 0, x, y, r); rg.addColorStop(0, col); rg.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = rg; c.fillRect(0, 0, W, H); };
+    blob(W * 0.62, H * 0.48, 620, "rgba(40,90,200,.38)"); blob(W * 0.72, H * 0.4, 380, "rgba(70,140,255,.28)"); blob(W * 0.5, H * 0.62, 420, "rgba(30,60,150,.25)");
+    ICONS.forEach((ic, i) => { if (i !== 1) drawIconCell(c, ic); });
+    c.fillStyle = "rgba(18,20,28,.94)"; c.fillRect(0, H - 56, W, 56);
+    c.fillStyle = "rgba(255,255,255,.06)"; c.fillRect(0, H - 56, W, 1);
+    const apps = ["#3a7bd5", "#e8b64c", "#2aa876", "#9b6bd6", "#d64545"];
+    apps.forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.roundRect(W / 2 - 150 + i * 62, H - 44, 32, 32, 7); c.fill(); });
+  })();
+  function drawDesk(c, clockText, dateText = "23/10/2026") {
+    c.drawImage(desk, 0, 0, W, H);
+    setFont(c, 17, F.atk); c.fillStyle = "#e6e9f2"; c.textAlign = "right"; c.fillText(clockText, W - 24, H - 32); c.fillStyle = "#aab0c0"; c.font = `400 14px "Atkinson"`; c.fillText(dateText, W - 24, H - 13);
+  }
+
+  // ---------- film looks ----------
+  const grains = [0, 1, 2, 3].map((k) => { const c = mk(256, 256), g = c.getContext("2d"), id = g.createImageData(256, 256), r = rng(99 + k); for (let i = 0; i < id.data.length; i += 4) { const v = r() * 255; id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255; } g.putImageData(id, 0, 0); return c; });
+  const vignette = mk(W, H); (function () { const c = vignette.getContext("2d"), rg = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.95); rg.addColorStop(0, "rgba(0,0,0,0)"); rg.addColorStop(1, "rgba(0,0,0,.78)"); c.fillStyle = rg; c.fillRect(0, 0, W, H); })();
+  const scan = mk(4, 4); (function () { const c = scan.getContext("2d"); c.fillStyle = "rgba(0,0,0,.22)"; c.fillRect(0, 0, 4, 1); })();
+  function grain(c, frame, alpha) {
+    const gc = grains[frame % 4]; c.save(); c.globalAlpha = alpha; c.globalCompositeOperation = "overlay";
+    const ox = (hash(frame, 1) * 256) | 0, oy = (hash(frame, 2) * 256) | 0;
+    c.translate(-ox, -oy); c.fillStyle = c.createPattern(gc, "repeat"); c.fillRect(0, 0, W + 256, H + 256); c.restore();
+  }
+  function foundFootage(c, t, frame, stamp, intensity = 1) {
+    c.save();
+    c.globalCompositeOperation = "color"; c.fillStyle = "rgba(110,255,170,.32)"; c.fillRect(0, 0, W, H);
+    c.globalCompositeOperation = "source-over";
+    c.fillStyle = c.createPattern(scan, "repeat"); c.fillRect(0, 0, W, H);
+    c.drawImage(vignette, 0, 0, W, H);
+    c.restore();
+    grain(c, frame, 0.22 * intensity);
+    // camcorder furniture
+    c.save(); c.strokeStyle = "rgba(255,255,255,.85)"; c.lineWidth = 4;
+    const m = 64, L = 70;
+    [[m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1]].forEach(([x, y, sx, sy]) => { c.beginPath(); c.moveTo(x, y + sy * L); c.lineTo(x, y); c.lineTo(x + sx * L, y); c.stroke(); });
+    setFont(c, 34, F.mono, "normal", "600"); c.textAlign = "left"; c.fillStyle = "#fff"; c.fillText("REC", m + 70, m + 58);
+    if ((t % 1) < 0.62) { c.fillStyle = "#ff3b3b"; c.beginPath(); c.arc(m + 46, m + 46, 12, 0, Math.PI * 2); c.fill(); }
+    c.textAlign = "right"; c.fillStyle = "#fff"; c.fillText(stamp, W - m - 26, H - m - 24);
+    setFont(c, 22, F.mono); c.fillText("NIGHT 1", W - m - 26, H - m - 70);
+    c.strokeStyle = "#fff"; c.lineWidth = 3; c.strokeRect(W - m - 116, m + 26, 70, 30); c.fillStyle = "#fff"; c.fillRect(W - m - 46, m + 34, 6, 14); c.fillRect(W - m - 110, m + 32, 26, 18);
+    c.restore();
+  }
+  function letterbox(c, k = 1) { const bh = 116 * k; c.fillStyle = "#000"; c.fillRect(0, 0, W, bh); c.fillRect(0, H - bh, W, bh); }
+  function clockStamp(base, add) { const s = Math.floor(base + add); const hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60; return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`; }
+
+  // glitch: tears and colour split over the whole frame (copies through a temp canvas)
+  function glitchFrame(g, frame) {
+    if (g <= 0.01) return;
+    tctx.setTransform(1, 0, 0, 1, 0, 0); tctx.clearRect(0, 0, tmp.width, tmp.height); tctx.drawImage(out, 0, 0);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const bands = 14, bhPx = out.height / bands;
+    for (let i = 0; i < bands; i++) { const r = hash(frame, i); if (r < 0.5 * g) { const off = (hash(frame, i + 40) - 0.5) * 220 * g * Q; ctx.drawImage(tmp, 0, i * bhPx, out.width, bhPx, off, i * bhPx, out.width, bhPx); } }
+    // colour split
+    for (const [col, dx] of [["#ff2bd6", -1], ["#2bf3ff", 1]]) {
+      nctx.globalCompositeOperation = "source-over"; nctx.clearRect(0, 0, tint.width, tint.height); nctx.drawImage(tmp, 0, 0);
+      nctx.globalCompositeOperation = "multiply"; nctx.fillStyle = col; nctx.fillRect(0, 0, tint.width, tint.height);
+      nctx.globalCompositeOperation = "destination-in"; nctx.drawImage(tmp, 0, 0);
+      ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = 0.55 * Math.min(1, g * 1.4); ctx.drawImage(tint, dx * 16 * g * Q, 0);
+    }
+    ctx.restore();
+  }
+  // visual cues in authored time (the soundtrack's cues in timeline.json are in final time)
+  const VC = { laugh: [43.55, 44.6, 49.0], flash: [52.6, 54.4], linkDrop: [93.25], linkRattle: [93.55, 93.8, 94.05],
+    glitch: [[48.2, 0.5], [65.4, 0.8], [56.0, 0.25], [56.45, 0.2], [56.85, 0.2], [57.2, 0.15], [57.5, 0.15], [57.8, 0.12], [58.05, 0.12], [58.3, 0.1], [58.5, 0.1], [58.7, 0.1], [58.85, 0.1], [59.0, 1.0]] };
+  const cueGlitch = (t) => { let g = 0; for (const [s, d] of VC.glitch) if (t >= s && t < s + d) g = Math.max(g, 1 - (t - s) / d * 0.6); return g; };
+
+  // ---------- per-shot state ----------
+  const ORBIT = [["pdf", "#d64545"], ["exe", "#e07b1f"], ["zip", "#c99a1e"], ["iso", "#6b7280"], ["jpg", "#2aa876"], ["docx", "#2f6fd6"], ["mp3", "#9b6bd6"], ["exe", "#e07b1f"]];
+  let lastShot = null, pr = rng(1), now = 0;
+  const cam = { x: 0, y: 0, z: 1, sx: 0, sy: 0, rot: 0 };
+  function camTo2D(c) { const z = cam.z; c.setTransform(Q * z * Math.cos(cam.rot), Q * z * Math.sin(cam.rot), -Q * z * Math.sin(cam.rot), Q * z * Math.cos(cam.rot), Q * (W / 2 - z * (W / 2 + cam.x) + cam.sx), Q * (H / 2 - z * (H / 2 + cam.y) + cam.sy)); }
+  function camToPixi() { const z = cam.z; for (const w of [world, sys.world]) { w.scale.set(Q * z); w.rotation = cam.rot; w.position.set(Q * (W / 2 - z * (W / 2 + cam.x) + cam.sx), Q * (H / 2 - z * (H / 2 + cam.y) + cam.sy)); } }
+  function shake(t, amp, freq = 31) { cam.sx = amp * (Math.sin(t * freq) + 0.5 * Math.sin(t * freq * 2.3 + 1)); cam.sy = amp * (Math.cos(t * freq * 1.1) + 0.5 * Math.sin(t * freq * 1.7)); }
+  function showOnly(...keys) { for (const k in SP) { const on = keys.includes(k); if (on && SP[k].root.parent !== spiritLayer) spiritLayer.addChild(SP[k].root); if (!on && SP[k].root.parent) spiritLayer.removeChild(SP[k].root); } }
+  function spawnFor(sp, dt, rate = 1) { sp.s.pRate = rate; }
+  function resetSpirit(sp) { Object.assign(sp.s, { open: 0, flare: 0, laugh: 0, tremble: 0, arm: 0, pins: 0, halo: 0.99, haloFlash: 0, begone: false, look: null, glitch: 0, alpha: 1, vx: 0, eyesOpen: 1, pRate: 1, twin: 1 }); Object.assign(sp.head, { a: 0, va: 0, ox: 0, vox: 0, oy: 0, voy: 0 }); }
+  // each scene's key light, in the trailer's 1920 x 1080 space: it's what gives the spirits their shape
+  function lightFor(id, t) {
+    const L = {
+      warning: [W * 0.22, H * 0.16, 520], past: [W * 0.8, H * 0.2, 380], pastFile: [W * 0.68, H * 0.86, 240],
+      present: [W * 0.14 + 80 * Math.sin(t * 0.6), H * 0.08, 420], begone: [W * 0.2, H * 0.05, 420],
+      yet: [W * 0.22, H * 1.02, 240], stone: [W * 0.38, H * 0.78, 260], strobe: [W * 0.5, H * 0.95, 280], found2: [W * 0.5, H * 1.15, 260], link: [W * 0.45, H * 0.3, 320]
+    }[id] || [W * 0.3, H * 0.2, 400];
+    sys.light.x = L[0]; sys.light.y = L[1]; sys.light.z = L[2];
+    sys.fog = ["past", "pastFile", "present", "begone", "yet", "stone"].includes(id) ? 1 : id === "warning" ? 0.5 : 0;
+  }
+  const RAMP = { warning: "marl", past: "past", pastFile: "past", present: "present", begone: "present", yet: "yet", stone: "yet", found2: "yet", link: "marl", strobe: "marl" };
+  let ramp = "marl";
+  const talkOpen = (text, n) => { const ch = text[Math.floor(n)] || " "; return /[aeiou]/i.test(ch) ? 1 : /[\s.,?!]/.test(ch) ? 0 : 0.55; };
+
+  function speechCard(c, who, whoCol, text, x, y, w, px, n, fam, border, glitchSeed = -1) {
+    setFont(c, px, fam); const lines = wrapLines(c, text, w - 56);
+    const h = 70 + lines.length * px * 1.3;
+    panel(c, x, y, w, h, border);
+    setFont(c, 15, F.mono, "normal", "600"); c.fillStyle = whoCol; c.textAlign = "left"; c.fillText(who.toUpperCase().split("").join(" "), x + 28, y + 38);
+    setFont(c, px, fam); c.fillStyle = "#ecebf6"; typed(c, text, x + 28, y + 50 + px * 1.05, { maxW: w - 56, px, n, glitchSeed });
+  }
+  function slamCard(c, text, lt, frame, sub) {
+    c.setTransform(Q, 0, 0, Q, 0, 0); c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
+    const k = easeOut(lt / 0.14), s = lerp(1.22, 1, k) * (1 + lt * 0.03);
+    c.save(); c.translate(W / 2 + cam.sx, H / 2 + cam.sy); c.scale(s, s);
+    setFont(c, 150, F.cinzel, "normal", "700"); c.textAlign = "center"; c.textBaseline = "middle"; c.letterSpacing = "16px";
+    const split = Math.max(0, 1 - lt / 0.35) * 26;
+    c.globalCompositeOperation = "lighter";
+    if (split > 0.5) { c.fillStyle = "rgba(255,40,200,.75)"; c.fillText(text, -split, 0); c.fillStyle = "rgba(40,240,255,.75)"; c.fillText(text, split, 0); }
+    c.globalCompositeOperation = "source-over"; c.globalAlpha = clamp(lt / 0.06); c.fillStyle = "#f4f2fb"; c.fillText(text, 0, 0);
+    c.restore(); c.letterSpacing = "0px";
+    if (sub && lt > 0.5) { const f = hash(frame, 3) < 0.85 ? 1 : 0.2; setFont(c, 30, F.mono); c.fillStyle = `rgba(160,155,185,${0.9 * f})`; c.textAlign = "center"; c.textBaseline = "alphabetic"; c.fillText(sub, W / 2, H / 2 + 140); }
+  }
+
+  // ---------- the frame ----------
+  function render(t, dt, frame) {
+    now = t;
+    const shot = shotAt(t), lt = t - shot.start;
+    t = shot.orig === null ? 1000 + lt : shot.orig + lt; now = t;
+    if (shot !== lastShot) { sys.clearParticles(); for (const k in SP) resetSpirit(SP[k]); pr = rng(1000 + TL.shots.indexOf(shot)); hideLinks(); stone.visible = false; lastShot = shot; }
+    Object.assign(cam, { x: 0, y: 0, z: 1, sx: 0, sy: 0, rot: 0 });
+    ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; ctx.filter = "none";
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+    let usePixi = false, front = null, post = { found: null, letter: 0, flash: 0, fade: 0 };
+    lightFor(shot.id, t); ramp = RAMP[shot.id] || "marl";
+    showOnly();
+
+    switch (shot.id) {
+      case "found1": {
+        cam.z = 1.02 + lt * 0.002; cam.rot = 0.0015 * Math.sin(t * 0.7); shake(t, 2.2, 2.1);
+        if (t > 9.4) shake(t, 2 + (t - 9.4) * 6, 40);
+        camTo2D(ctx); drawDesk(ctx, "2:14 AM");
+        const flick = t > 6.0 && t < 6.7 ? (hash(frame, 5) < 0.5 ? 0.25 : 1) : 1;
+        const sub = t > 8.5 && t < 8.78;
+        drawIconCell(ctx, ICONS[1], { alpha: flick, selected: t > 5.15 && t < 9.4, label: sub ? "I remember you." : null, labelCol: sub ? "#ffb3b3" : "#fff" });
+        if (t > 3.5 && t < 5.0) drawIconCell(ctx, ICONS[2], { selected: true });
+        const K = [[0, 980, 640], [1.3, 640, 520], [1.9, iconCentre(0).x, iconCentre(0).y], [2.7, iconCentre(0).x + 4, iconCentre(0).y + 2], [3.5, iconCentre(2).x, iconCentre(2).y], [4.6, iconCentre(1).x + 10, iconCentre(1).y + 30], [5.15, iconCentre(1).x, iconCentre(1).y], [7.6, iconCentre(1).x, iconCentre(1).y], [8.3, iconCentre(1).x + 14, iconCentre(1).y + 6], [9.6, 300, 420], [11, 340, 460]];
+        let p = K[K.length - 1]; for (let i = 0; i < K.length - 1; i++) if (t >= K[i][0] && t < K[i + 1][0]) { const k = ease((t - K[i][0]) / (K[i + 1][0] - K[i][0])); p = [t, lerp(K[i][1], K[i + 1][1], k), lerp(K[i][2], K[i + 1][2], k)]; }
+        cursor(ctx, p[1], p[2]);
+        post.found = clockStamp(2 * 3600 + 14 * 60 + 7, lt);
+        post.glitch = t > 9.4 ? prog(t, 9.4, 11) * 0.9 : 0;
+        break;
+      }
+      case "eulogy": {
+        ctx.setTransform(Q, 0, 0, Q, 0, 0);
+        const L = [
+          { a: 11.6, b: 15.0, text: "Jacob Marlware was dead, to begin with.", px: 64, y: 520 },
+          { a: 15.2, b: 18.3, text: "There is no doubt whatever about that.", px: 56, y: 520 },
+          { a: 18.5, b: 23.7, text: "The record of his removal was signed by the antivirus, the Task Manager, the Registry, and Windows Update.", px: 44, y: 470, cps: 38 },
+          { a: 23.9, b: 26.4, text: "Jacob Marlware was as dead as a floppy disk.", px: 64, y: 520 }
+        ];
+        for (const l of L) if (t >= l.a && t < l.b) {
+          const k = t - l.a, fadeOut = 1 - prog(t, l.b - 0.45, l.b);
+          ctx.save(); ctx.globalAlpha = fadeOut; setFont(ctx, l.px, F.fell); ctx.fillStyle = "#ece9f6";
+          const s = 1 + k * 0.012; ctx.translate(W / 2, l.y); ctx.scale(s, s);
+          typed(ctx, l.text, 0, 0, { maxW: 1380, px: l.px, lh: 1.32, n: k * (l.cps || (l.text.length > 60 ? 42 : 21)), glitchSeed: frame, align: "center" });
+          ctx.restore();
+        }
+        grain(ctx, frame, 0.18);
+        break;
+      }
+      case "warning": {
+        usePixi = true;
+        const m = SP.marl; showOnly("marl");
+        const push = ease(prog(t, 32.3, 33.8));
+        cam.x = lerp(0, 560, push); cam.y = lerp(0, 230, push); cam.z = lerp(1.02, 1.7, push); shake(t, 1.6 + push * 4, 2.3 + push * 20);
+        camTo2D(ctx); drawDesk(ctx, "2:31 AM");
+        m.place(W - 330, H - 56 - 238, 470);
+        const app0 = prog(t, 25.0, 26.2);
+        m.s.alpha = app0 < 1 ? (hash(frame, 11) < 0.5 + app0 * 0.5 ? app0 : app0 * 0.3) : 1;
+        m.s.glitch = t < 26.2 ? (1 - app0) * 0.8 : 0; m.s.gseed = frame;
+        m.s.look = push > 0.2 ? null : { x: 900, y: 500 };
+        const l1 = "You will be haunted by three spirits.", l2 = "Expect the first within the half hour.";
+        let line = null, n = 0;
+        if (t >= 26.4 && t < 29.4) { line = l1; n = (t - 26.4) * 24; } else if (t >= 29.6 && t < 32.3) { line = l2; n = (t - 29.6) * 24; }
+        m.s.open = line && n < line.length ? talkOpen(line, n) : 0; m.s.flare = line ? 1 : 0;
+        spawnFor(m, dt);
+        // his chain: from the hand to a coil on the floor
+        m.update(t, dt);
+        const hp = m.bodyBend(298, 485, { x: 0, y: 0 }, t); const hg = m.bodyToWorld(hp.x, hp.y);
+        const floorY = H - 56 - 18, lh = 40, pitch = lh * 0.62;
+        let px0 = hg.x, py0 = hg.y, i = 0;
+        const pts = [];
+        for (let y = py0; y < floorY; y += pitch) pts.push([px0 + Math.sin(t * 1.3 + y * 0.01) * 4 * (y - py0) / 200, y]);
+        for (let a = 0; a < 10; a++) pts.push([px0 - 20 - a * pitch * 0.95, floorY + Math.sin(a * 1.7) * 3]);
+        for (let j = 0; j < pts.length - 1; j++) { const s = linkSprite(i++); const [ax, ay] = pts[j], [bx, by] = pts[j + 1]; s.visible = true; s.alpha = m.s.alpha; s.position.set((ax + bx) / 2, (ay + by) / 2); s.rotation = Math.atan2(by - ay, bx - ax) - Math.PI / 2; s.height = lh; s.width = lh * (j % 2 ? 0.37 : 0.75); }
+        hideLinks(i);
+        front = () => {
+          camTo2D(ctx);
+          if (line) speechCard(ctx, "Jacob Marlware", "#8ff0ee", line, W - 1180, H - 640, 600, 34, n, F.fell, "rgba(143,240,238,.4)", frame);
+        };
+        post.found = clockStamp(2 * 3600 + 31 * 60 + 44, lt);
+        post.flash = t > 33.72 ? 1 : 0;
+        break;
+      }
+      case "bell": {
+        ctx.setTransform(Q, 0, 0, Q, 0, 0);
+        const a = prog(t, 34.5, 35.1) * (1 - prog(t, 35.55, 35.95));
+        ctx.globalAlpha = a; setFont(ctx, 48, F.fell, "italic"); ctx.fillStyle = "#b9b4cc"; ctx.textAlign = "center"; ctx.fillText("The bell has struck One.", W / 2, H / 2);
+        ctx.globalAlpha = 1; grain(ctx, frame, 0.15);
+        break;
+      }
+      case "card1": case "card2": case "card3": {
+        shake(t, Math.max(0, 1 - lt / 0.3) * 14, 47);
+        slamCard(ctx, shot.text, lt, frame, shot.id === "card3" ? "(press Esc)" : null);
+        grain(ctx, frame, 0.16);
+        break;
+      }
+      case "past": {
+        usePixi = true; const p = SP.past; showOnly("past");
+        cam.z = 1 + lt * 0.02;
+        ctx.setTransform(Q, 0, 0, Q, 0, 0);
+        const rg = ctx.createRadialGradient(W * 0.38, H * 0.5, 50, W * 0.38, H * 0.5, 1100); rg.addColorStop(0, "#241a2a"); rg.addColorStop(1, "#030205"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+        p.place(W * 0.36, H * 0.56, 640); p.s.look = { x: W * 0.7, y: H * 0.45 };
+        const text = "I am the Ghost of Downloads Past.";
+        const shown = Math.max(0, (t - 37.9) * 2.6);
+        p.s.open = shown > 0 && shown < 7 ? 0.35 + 0.65 * Math.abs(Math.sin(shown * Math.PI)) : 0; p.s.flare = shown > 0 && shown < 7 ? 1 : 0;
+        spawnFor(p, dt);
+        const orbit = (back) => { camTo2D(ctx); ORBIT.forEach(([ext, col], i) => { const a = t * 0.45 + i * (Math.PI * 2 / ORBIT.length); const depth = Math.sin(a); if ((depth < 0) !== back) return; const x = W * 0.36 + Math.cos(a) * 430, y = H * 0.54 + depth * 120; const s = 0.9 + depth * 0.25; ctx.save(); ctx.globalAlpha = 0.55 + depth * 0.3; fileIcon(ctx, x - 26 * s, y - 33 * s, s, ext, col); ctx.restore(); }); };
+        orbit(true);
+        front = () => {
+          orbit(false);
+          ctx.setTransform(Q, 0, 0, Q, 0, 0); setFont(ctx, 70, F.corm, "italic", "300"); ctx.fillStyle = "#fff4e6";
+          words(ctx, text, W * 0.6, H * 0.43, { maxW: 680, px: 70, shown, mode: "surface" });
+        };
+        post.letter = 1;
+        break;
+      }
+      case "pastFile": {
+        usePixi = true; const p = SP.past; showOnly("past");
+        p.place(W * 0.3, H * 0.57, 800); p.s.look = lt < 4.9 ? { x: W * 0.5, y: H * 0.5 } : { x: W * 0.68, y: H * 0.8 };
+        p.s.alpha = 0.2 + 0.2 * prog(lt, 4.5, 5.0);
+        p.s.open = lt > 4.75 && lt < 5.9 ? 0.35 + 0.65 * Math.abs(Math.sin((lt - 4.75) * 2.6 * Math.PI)) : 0; p.s.flare = p.s.open > 0 ? 1 : 0;
+        cam.z = 1.03 + lt * 0.006;
+        const x = W / 2 - 520, y = H / 2 - 230, w = 1040, h = 380, chipY = y + h - 76;
+        const plea = "You have moved on to 3.0.21. I am a relic of 3.0.20. Let me go.";
+        setFont(ctx, 22, F.mono); const chip0 = ctx.measureText("Lay to rest").width + 36;
+        const chipC = { x: x + 40 + chip0 / 2, y: chipY + 22 };
+        const crypt = { x: W * 0.68, base: H - 132 };
+        const collapse = easeIn(prog(lt, 4.3, 4.62)), pop = prog(lt, 4.5, 4.85), fly = ease(prog(lt, 4.95, 6.0));
+        const inCrypt = lt >= 6.0, cryptK = easeOut(prog(lt, 4.3, 4.9)), glowK = inCrypt ? Math.exp(-(lt - 6.0) * 2.2) : 0;
+        const iconAt = (k) => ({ x: lerp(W / 2, crypt.x, k), y: lerp(H / 2 - 60, crypt.base - 120, k) - Math.sin(k * Math.PI) * 150 });
+        front = () => {
+          ctx.setTransform(Q, 0, 0, Q, 0, 0);
+          if (cryptK > 0) drawCrypt(ctx, crypt.x, crypt.base + (1 - cryptK) * 60, cryptK, glowK);
+          if (collapse < 1) {
+            const sl = easeOut(prog(lt, 0, 0.35));
+            ctx.save(); ctx.globalAlpha = sl;
+            ctx.translate(W / 2, y + h / 2 + (1 - sl) * 60); ctx.scale(1 - collapse * 0.35, Math.max(0.001, 1 - collapse)); ctx.translate(-W / 2, -(y + h / 2));
+            panel(ctx, x, y, w, h, "rgba(143,240,238,.4)", "rgba(10,14,24,.94)");
+            setFont(ctx, 44, F.mono, "normal", "600"); ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText("vlc-3.0.20-win64.exe", x + 40, y + 76);
+            setFont(ctx, 26, F.mono); ctx.fillStyle = "#948fae"; ctx.fillText("42 MB · 14 months · videolan.org", x + 40, y + 122);
+            setFont(ctx, 32, F.mono); ctx.fillStyle = "#dffcfb"; typed(ctx, plea, x + 40, y + 186, { maxW: w - 80, px: 32, lh: 1.4, n: (lt - 0.5) * 24 });
+            let cx = x + 40; setFont(ctx, 22, F.mono);
+            ["Lay to rest", "Banish", "Keep"].forEach((ch, i) => { const cw = ctx.measureText(ch).width + 36; const on = i === 0 && lt > 4.1; ctx.beginPath(); ctx.roundRect(cx, chipY, cw, 44, 8); ctx.fillStyle = on ? "#8ff0ee" : "rgba(0,0,0,0)"; ctx.fill(); ctx.strokeStyle = on ? "#8ff0ee" : "#3a3550"; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = on ? "#09080f" : "#b8b3cc"; ctx.fillText(ch, cx + 18, chipY + 30); cx += cw + 14; });
+            ctx.restore();
+          }
+          if (pop > 0 && !inCrypt) {
+            const pos = iconAt(fly), c1 = 1.70158, q = pop - 1, sPop = pop >= 1 ? 1 : 1 + (c1 + 1) * q * q * q + c1 * q * q, sc = 2.6 * sPop * (1 - 0.6 * fly);
+            for (let j = 1; j <= 12 && fly > 0; j++) { const kk = clamp(fly - j * 0.03); const tp = iconAt(kk); ctx.fillStyle = `rgba(143,240,238,${0.55 * (1 - j / 13)})`; ctx.fillRect(tp.x + (hash(frame, j) - 0.5) * 60, tp.y + (hash(frame, j + 20) - 0.5) * 50, 6, 6); }
+            ctx.save(); ctx.globalAlpha = 0.95 - 0.3 * fly; ctx.shadowColor = "#8ff0ee"; ctx.shadowBlur = 30 + 30 * fly;
+            fileIcon(ctx, pos.x - 26 * sc, pos.y - 33 * sc, sc, "exe", "#e07b1f");
+            ctx.restore();
+          }
+          if (lt > 4.7) { setFont(ctx, 66, F.corm, "italic", "300"); ctx.fillStyle = "#fff4e6"; words(ctx, "It goes gently.", W * 0.56, 300, { px: 66, shown: (lt - 4.7) * 2.6, mode: "surface", align: "center" }); }
+          const ta = prog(lt, 6.3, 6.8);
+          if (ta > 0) { ctx.globalAlpha = ta; setFont(ctx, 30, F.mono, "normal", "600"); ctx.fillStyle = "#dffcfb"; ctx.textAlign = "center"; ctx.fillText("1 soul at rest · 42 MB ready to bury", crypt.x, 600); ctx.globalAlpha = 1; }
+          if (lt > 3.3 && lt < 4.6) { const k = ease(prog(lt, 3.3, 4.0)), press = lt > 4.05 && lt < 4.2 ? 0.86 : 1; cursor(ctx, lerp(W / 2 + 560, chipC.x, k), lerp(H / 2 + 330, chipC.y, k), press, 1 - prog(lt, 4.35, 4.6)); }
+        };
+        post.letter = 1;
+        break;
+      }
+      case "present": case "begone": {
+        usePixi = true; const p = SP.present; showOnly("present");
+        ctx.setTransform(Q, 0, 0, Q, 0, 0);
+        const rg = ctx.createRadialGradient(W / 2, H * 0.55, 60, W / 2, H * 0.55, 1100); rg.addColorStop(0, "#1c2218"); rg.addColorStop(1, "#030403"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+        const close = shot.id === "begone";
+        const text = close ? "Impostors, begone!" : "Come in! Come in, and know me better, man!";
+        const start = close ? 48.3 : 43.55, shown = Math.max(0, (t - start) * (close ? 5 : 4.4));
+        const ws = text.split(" "); const cur = ws[Math.min(ws.length - 1, Math.floor(shown))] || "";
+        const laughAt = VC.laugh.filter((x) => t >= x && t < x + 0.9); p.s.laugh = laughAt.length ? 1 - (t - laughAt[laughAt.length - 1]) / 0.9 : 0;
+        p.s.open = shown > 0 && shown < ws.length + 0.5 ? 0.4 + 0.6 * Math.abs(Math.sin(shown * Math.PI)) : 0; p.s.flare = p.s.open > 0 ? 1 : 0;
+        if (close) { p.place(W * 0.5, H * 1.05, 1500); p.s.look = null; p.s.begone = t > 48.6; p.s.glitch = t > 48.55 && t < 48.95 ? 1 : 0; p.s.gseed = frame; shake(t, p.s.laugh * 10 + (t > 48.55 && t < 48.9 ? 12 : 0), 40); }
+        else { p.place(W * 0.5, H * 0.6, 700); p.s.look = { x: W * 0.5, y: H * 0.85 }; cam.z = 1 + lt * 0.015; shake(t, p.s.laugh * 6, 33); }
+        spawnFor(p, dt);
+        front = () => {
+          ctx.setTransform(Q, 0, 0, Q, cam.sx * Q, cam.sy * Q); setFont(ctx, close ? 120 : 76, F.abril); ctx.fillStyle = "#ffe7a3";
+          words(ctx, text, W / 2, close ? H * 0.27 : H * 0.2, { maxW: 1500, px: close ? 120 : 76, shown, mode: "pop", align: "center" });
+        };
+        post.letter = 1;
+        break;
+      }
+      case "dupes": case "dupesFall": {
+        ctx.setTransform(Q, 0, 0, Q, 0, 0);
+        const rg = ctx.createRadialGradient(W / 2, H / 2, 60, W / 2, H / 2, 1100); rg.addColorStop(0, "#151a14"); rg.addColorStop(1, "#020302"); ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+        const fall = shot.id === "dupesFall";
+        const cards = [
+          { name: "report.pdf", meta: "Documents · 3 March", text: "I was here first, in a proper folder, with a proper name.", x: W / 2 - 900, t0: 0.45 },
+          { name: "report (1).pdf", meta: "Downloads · 3 March", text: "You were saved. I was downloaded. Which of us did they mean to keep?", x: W / 2 + 40, t0: 2.9 }
+        ];
+        const y = H / 2 - 250, w = 860, h = 360;
+        const slide = fall ? 1 : easeOut(prog(lt, 0, 0.35));
+        const chipT = fall ? 1 : prog(lt, 5.5, 5.85), picked = fall || lt > 6.5, suggest = fall ? 1 : prog(lt, 5.4, 5.9);
+        setFont(ctx, 22, F.mono); const chipW = ctx.measureText("This one is real").width + 40;
+        const drawCard = (cd, i, x, alpha) => {
+          ctx.save(); ctx.globalAlpha = alpha;
+          const speaking = !fall && lt >= cd.t0 && lt < cd.t0 + cd.text.length / 26 + 0.3, gold = i === 0 ? suggest : 0;
+          if (gold > 0) { ctx.shadowColor = `rgba(255,220,140,${0.6 * gold})`; ctx.shadowBlur = 44 * gold; }
+          panel(ctx, x, y, w, h, gold > 0 ? `rgba(255,220,140,${0.35 + 0.6 * gold})` : speaking ? "rgba(255,231,163,.75)" : "rgba(255,231,163,.25)", "rgba(12,14,10,.94)");
+          ctx.shadowBlur = 0;
+          setFont(ctx, 40, F.mono, "normal", "600"); ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.fillText(cd.name, x + 36, y + 70);
+          setFont(ctx, 24, F.mono); ctx.fillStyle = "#948fae"; ctx.fillText(cd.meta, x + 36, y + 112);
+          setFont(ctx, 31, F.mono); ctx.fillStyle = "#dffcfb"; typed(ctx, cd.text, x + 36, y + 176, { maxW: w - 72, px: 31, lh: 1.42, n: fall ? 1e9 : (lt - cd.t0) * 26 });
+          if (chipT > 0 && (!fall || i === 0)) {
+            const on = i === 0 && picked, cy = y + h + 22;
+            ctx.globalAlpha = alpha * chipT; ctx.beginPath(); ctx.roundRect(x + 36, cy, chipW, 46, 8); ctx.fillStyle = on ? "#ffe7a3" : "rgba(0,0,0,0)"; ctx.fill();
+            ctx.strokeStyle = on ? "#ffe7a3" : "#3a3550"; ctx.lineWidth = 2; ctx.stroke();
+            setFont(ctx, 22, F.mono, "normal", "600"); ctx.fillStyle = on ? "#1a1508" : "#b8b3cc"; ctx.textAlign = "left"; ctx.fillText(fall ? "The real one" : "This one is real", x + 56, cy + 31);
+          }
+          ctx.restore();
+        };
+        if (!fall) {
+          drawCard(cards[0], 0, cards[0].x - (1 - slide) * 300, slide);
+          drawCard(cards[1], 1, cards[1].x + (1 - slide) * 300, slide);
+          const a = prog(lt, 5.0, 5.4);
+          ctx.globalAlpha = a; setFont(ctx, 26, F.mono); ctx.fillStyle = "#b8b3cc"; ctx.textAlign = "center";
+          ctx.fillText("SHA-256   9f2c 7a1e … 41ab   =   9f2c 7a1e … 41ab", W / 2, H / 2 + 262);
+          setFont(ctx, 18, F.mono, "normal", "600"); ctx.letterSpacing = "6px"; ctx.fillStyle = "#ffe7a3"; ctx.fillText("IDENTICAL TO THE LAST BYTE", W / 2, H / 2 + 302); ctx.letterSpacing = "0px"; ctx.globalAlpha = 1;
+          if (lt > 5.6) { const k = ease(prog(lt, 5.6, 6.3)), press = lt > 6.45 && lt < 6.6 ? 0.86 : 1; cursor(ctx, lerp(W / 2 + 300, cards[0].x + 36 + chipW / 2, k), lerp(H / 2 + 380, y + h + 45, k), press, 1 - prog(lt, 6.9, 7.3)); }
+        } else {
+          // the impostor glitches, breaks and falls away; the real one takes the centre
+          const ax = lerp(cards[0].x, W / 2 - w / 2, easeOut(prog(lt, 1.0, 1.8)));
+          drawCard(cards[0], 0, ax, 1);
+          const fk = easeIn(prog(lt, 0.45, 1.5));
+          if (fk < 1) {
+            const bx = cards[1].x + (lt < 0.45 ? (hash(frame, 1) - 0.5) * 70 : 0), cxm = bx + w / 2, cym = y + h / 2;
+            ctx.save(); ctx.translate(cxm, cym + fk * 820); ctx.rotate(fk * 0.35); ctx.translate(-cxm, -cym);
+            drawCard(cards[1], 1, bx, (lt < 0.45 && hash(frame, 2) < 0.3 ? 0.35 : 1) * (1 - fk * fk));
+            ctx.restore();
+          }
+          if (lt > 0.45) {
+            const kk = lt - 0.45, cols = ["#8ff0ee", "#ff4fd8", "#ffe7a3", "#dffcfb"];
+            for (let j = 0; j < 44; j++) {
+              const sx = cards[1].x + hash(j, 1) * w, sy = y + hash(j, 2) * h, vy = 200 + hash(j, 3) * 500;
+              const px = sx + (hash(j, 4) - 0.5) * 260 * kk, py = sy + vy * kk + 500 * kk * kk, al = 1 - kk / 1.3;
+              if (al <= 0) continue;
+              ctx.globalAlpha = al; ctx.fillStyle = cols[j % 4]; const sz = 5 + hash(j, 5) * 10; ctx.fillRect(px, py, sz, sz);
+            }
+            ctx.globalAlpha = 1;
+          }
+          const ta = prog(lt, 1.2, 1.7);
+          if (ta > 0) { ctx.globalAlpha = ta; setFont(ctx, 30, F.mono, "normal", "600"); ctx.fillStyle = "#ffe7a3"; ctx.textAlign = "center"; ctx.fillText("1 impostor laid to rest · 2.4 MB ready to bury", W / 2, H / 2 + 262); ctx.globalAlpha = 1; }
+          post.glitch = lt < 0.45 ? 0.7 : 0;
+        }
+        post.letter = 1;
+        break;
+      }
+      case "yet": {
+        usePixi = true; const y = SP.yet; showOnly("yet");
+        const flash = VC.flash.some((f) => t >= f && t < f + 0.1);
+        ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#050409"; ctx.fillRect(0, 0, W, H);
+        const fog = ctx.createLinearGradient(0, H * 0.6, 0, H); fog.addColorStop(0, "rgba(60,60,110,0)"); fog.addColorStop(1, "rgba(60,60,110,.22)"); ctx.fillStyle = fog; ctx.fillRect(0, 0, W, H);
+        if (flash) { showOnly(); stone.visible = true; stone.position.set(W / 2, H * 0.92); stone.scale.set(1.25); CARVE[0].tx.text = CARVE[0].text; CARVE[1].tx.text = ""; post.flash = 0.35; }
+        else { stone.visible = false; const k = ease(prog(t, 50.8, 56)); y.place(W * 0.6, H * lerp(0.54, 0.6, k), lerp(820, 1040, k)); y.s.arm = 0.6; spawnFor(y, dt); }
+        front = () => {
+          ctx.setTransform(Q, 0, 0, Q, 0, 0);
+          const a = prog(t, 51.4, 52.0) * (1 - prog(t, 54.3, 54.9));
+          ctx.globalAlpha = a; setFont(ctx, 38, F.atk, "italic"); ctx.fillStyle = "#cfcbe0"; ctx.textAlign = "left"; ctx.fillText("“I fear you more than any spectre I have seen.”", 150, H - 190); ctx.globalAlpha = 1;
+        };
+        post.letter = 1;
+        break;
+      }
+      case "strobe": {
+        usePixi = true;
+        const SEQ = [[56.0, "marl"], [56.45, "file", "setup_final (2).exe"], [56.85, "pastHalo"], [57.2, "file", "Copy of report.pdf"], [57.5, "twin"], [57.8, "file", "IMG_4471 (1).jpg"], [58.05, "link"], [58.3, "file", "02:14 AM"], [58.5, "hood"], [58.7, "file", "invoice_march (3).pdf"], [58.85, "marl"], [59.0, "rapid"]];
+        let cur = SEQ[0]; for (const s of SEQ) if (t >= s[0]) cur = s;
+        let kind = cur[1];
+        if (kind === "rapid") { const kinds = ["hood", "marl", "pastHalo", "twin", "hood", "link"]; kind = kinds[Math.floor((t - 59) / 0.11) % kinds.length]; post.flash = Math.floor((t - 59) / 0.11) % 3 === 0 ? 0.25 : 0; }
+        ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+        ramp = { marl: "marl", pastHalo: "past", twin: "present", hood: "yet" }[kind] || "marl";
+        if (kind === "marl") { showOnly("marl"); SP.marl.place(1093, 1052, 2600); SP.marl.s.flare = 1; SP.marl.s.glitch = 1; SP.marl.s.gseed = frame; }
+        else if (kind === "pastHalo") { showOnly("past"); SP.past.place(1016, 1370, 2000); }
+        else if (kind === "twin") { showOnly("present"); SP.present.place(W * 0.42, H * 0.95, 1400); SP.present.s.laugh = 1; }
+        else if (kind === "hood") { showOnly("yet"); SP.yet.place(W * 0.68, H * 1.85, 4200); SP.yet.s.pins = 1; }
+        else if (kind === "link") { showOnly(); const s = linkSprite(0); s.visible = true; s.position.set(W / 2, H / 2); s.rotation = t * 3; s.height = 900; s.width = 675; hideLinks(1); }
+        else { showOnly(); front = () => { ctx.setTransform(Q, 0, 0, Q, 0, 0); setFont(ctx, 84, F.mono, "normal", "600"); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#f2f0fa"; ctx.fillText(cur[2], W / 2, H / 2); ctx.textBaseline = "alphabetic"; }; }
+        if (kind !== "link") hideLinks();
+        shake(t, 10, 50);
+        post.glitch = t > 59 ? 0.6 + 0.4 * prog(t, 59, 60) : 0.35;
+        break;
+      }
+      case "hush": case "after": { ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); break; }
+      case "found2": {
+        const jump = t >= 65.4;
+        cam.z = 1.02; shake(t, 2, 2.1); camTo2D(ctx);
+        drawDesk(ctx, t < 62.0 ? "2:59 AM" : "3:00 AM");
+        const path = (tt) => { const k = ease(prog(tt, 61.6, 63.8)); return { x: lerp(820, 1250, k) + Math.sin(tt * 3) * 18 * k, y: lerp(520, 470, k) + Math.cos(tt * 2.4) * 22 * k }; };
+        const real = path(Math.min(t, 63.8));
+        if (!jump) {
+          if (t > 62.2) {
+            let d = path(t - 0.5), s = 1;
+            if (t > 63.8) { const k = easeIn(prog(t, 63.9, 65.35)); d = { x: lerp(path(63.3).x, W / 2 - 40, k), y: lerp(path(63.3).y, H / 2 - 60, k) }; s = 1 + k * 7; }
+            cursor(ctx, d.x, d.y, s, 0.6 * prog(t, 62.2, 62.9), "#9ff7ff");
+          }
+          cursor(ctx, real.x, real.y);
+          post.found = clockStamp(2 * 3600 + 59 * 60 + 58, lt);
+        } else {
+          usePixi = true; showOnly("yet"); const y = SP.yet;
+          ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+          y.place(W * 0.7, H * 1.98, 4600); y.s.pins = 1; y.s.glitch = 1; y.s.gseed = frame;
+          shake(t, 26, 60); post.flash = t < 65.45 ? 1 : 0; post.glitch = 0.9;
+        }
+        break;
+      }
+      case "stone": {
+        usePixi = true; showOnly("yet"); const y = SP.yet;
+        ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#040308"; ctx.fillRect(0, 0, W, H);
+        const fog = ctx.createLinearGradient(0, H * 0.55, 0, H); fog.addColorStop(0, "rgba(70,70,120,0)"); fog.addColorStop(1, "rgba(70,70,120,.25)"); ctx.fillStyle = fog; ctx.fillRect(0, 0, W, H);
+        // push in on the inscription as it carves
+        const pz = ease(prog(t, 70.4, 74.6)), fx = W * 0.38 + 26, fy = H * 0.97 - 312 * 1.62;
+        cam.x = (fx - W / 2) * pz; cam.y = (fy - H / 2) * pz; cam.z = 1 + lt * 0.01 + 0.55 * pz;
+        y.place(W * 0.79, H * 0.5, 860); y.s.arm = ease(prog(t, 67.6, 69)); y.s.tremble = t > 73.4 ? 1 : 0; y.s.pins = t > 73.4 ? prog(t, 73.4, 74.2) : 0;
+        spawnFor(y, dt, 0.6);
+        stone.visible = true; const rise = easeOut(prog(t, 67.0, 68.6)); stone.scale.set(1.62); stone.position.set(W * 0.38, H * 0.97 + (1 - rise) * 800);
+        CARVE[0].tx.text = CARVE[0].text.slice(0, Math.max(0, Math.floor((t - 68.6) * 7)));
+        CARVE[1].tx.text = CARVE[1].text.slice(0, Math.max(0, Math.floor((t - 70.6) * 7)));
+        post.fade = prog(t, 75.3, 76); post.letter = 1;
+        break;
+      }
+      case "title": {
+        ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#030206"; ctx.fillRect(0, 0, W, H);
+        const r = rng(7);
+        for (let i = 0; i < 90; i++) { const x = r() * W, sp = 20 + r() * 40, y = (r() * H - (t - 76) * sp + H * 2) % H, a = 0.15 + r() * 0.35; ctx.fillStyle = `rgba(160,220,230,${a})`; ctx.fillRect(x, y, 2, 2); }
+        const s = 1 + (t - 76) * 0.008;
+        ctx.save(); ctx.translate(W / 2, H * 0.45); ctx.scale(s, s);
+        setFont(ctx, 132, F.cinzel, "normal", "700"); ctx.letterSpacing = "14px"; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+        const title = "A C-DRIVE CAROL", total = ctx.measureText(title).width; let x = -total / 2;
+        for (let i = 0; i < title.length; i++) {
+          const ch = title[i], cw = ctx.measureText(ch).width, k = prog(t, 76.15 + i * 0.09, 76.15 + i * 0.09 + 0.5);
+          if (k > 0) { ctx.save(); ctx.globalAlpha = k; const b = (1 - k) * 12; if (b > 0.3) ctx.filter = `blur(${b.toFixed(1)}px)`; ctx.shadowColor = "rgba(143,240,238,.55)"; ctx.shadowBlur = 24 * k; ctx.fillStyle = "#eef6f8"; ctx.fillText(ch, x, 0); ctx.restore(); }
+          x += cw;
+        }
+        ctx.letterSpacing = "0px"; ctx.restore();
+        const a = prog(t, 78.8, 79.6); ctx.globalAlpha = a; setFont(ctx, 48, F.fell, "italic"); ctx.fillStyle = "#cdc8df"; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"; ctx.fillText("A retelling of the greatest ghost story ever written.", W / 2, H * 0.62);
+        ctx.globalAlpha = 1; grain(ctx, frame, 0.14);
+        post.fade = prog(t, 83.6, 84.2);
+        break;
+      }
+      case "morning": {
+        ctx.setTransform(Q, 0, 0, Q, 0, 0);
+        const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#f7ead6"); g.addColorStop(0.55, "#f4d3b4"); g.addColorStop(1, "#e8c3a8"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.translate(-120, -160);
+        for (let i = 0; i < 7; i++) { const a = -0.15 + i * 0.12 + Math.sin(t * 0.25 + i) * 0.02; ctx.save(); ctx.rotate(a); ctx.fillStyle = "rgba(255,248,230,.07)"; ctx.fillRect(0, -30, 2600, 60 + i * 12); ctx.restore(); }
+        ctx.restore();
+        const r = rng(11); for (let i = 0; i < 50; i++) { const x = (r() * W + Math.sin(t * 0.3 + i) * 30), y = (r() * H - (t - 84) * (6 + r() * 10) + H) % H; ctx.fillStyle = "rgba(255,255,255,.55)"; ctx.fillRect(x, y, 2.5, 2.5); }
+        setFont(ctx, 38, F.plex, "normal", "300"); ctx.fillStyle = "#4a3f52"; ctx.textAlign = "center";
+        typed(ctx, "And so, as Tiny.tmp observed:", W / 2, H * 0.36, { n: (t - 85.0) * 26, align: "center", px: 38 });
+        setFont(ctx, 72, F.fell); ctx.fillStyle = "#2b2433";
+        words(ctx, "Git bless us, every one, and every zero.", W / 2, H * 0.5, { maxW: 1600, px: 72, shown: Math.max(0, (t - 86.7) * 2.4), mode: "surface", align: "center" });
+        let a = prog(t, 89.0, 89.7); ctx.globalAlpha = a; setFont(ctx, 30, F.atk); ctx.fillStyle = "#5c5064"; ctx.textAlign = "center"; ctx.fillText("Nothing deleted. Everything rests in the Crypt.", W / 2, H * 0.66);
+        a = prog(t, 90.6, 91.3); ctx.globalAlpha = a; setFont(ctx, 24, F.mono, "normal", "600"); ctx.letterSpacing = "8px"; ctx.fillStyle = "#7a6c80"; ctx.fillText("HACKYARD · YARD #5 · HAUNTED", W / 2, H * 0.78); ctx.letterSpacing = "0px";
+        ctx.globalAlpha = 1;
+        post.fade = prog(t, 92.4, 93.0);
+        break;
+      }
+      case "link": {
+        usePixi = true; showOnly();
+        ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+        const s = linkSprite(0); s.visible = t < 94.7; hideLinks(1);
+        const land = VC.linkDrop[0];
+        let y = H * 0.82, rot = 0.35;
+        if (t < land) { const k = easeIn(prog(t, 93.0, land)); y = lerp(-100, H * 0.82, k); rot = 0.35 + (1 - k) * 2; }
+        else { const b = t - land; y = H * 0.82 - Math.abs(Math.sin(b * 14)) * 30 * Math.exp(-b * 7); const kicks = VC.linkRattle.filter((x) => t >= x); const last = kicks.length ? t - kicks[kicks.length - 1] : 9; rot = Math.PI / 2 + 0.25 * Math.sin(last * 30) * Math.exp(-last * 8); }
+        s.position.set(W / 2, y); s.rotation = rot; s.height = 210; s.width = 158; s.alpha = 1;
+        if (t > 94.7) post.fade = 1;
+        break;
+      }
+    }
+
+    if (usePixi) {
+      camToPixi();
+      for (const k in SP) if (SP[k].root.parent) { if (shot.id !== "warning") SP[k].update(t, dt); }
+      const focusSp = spiritLayer.children[0] && spiritLayer.children[0].__sp;
+      const fh = focusSp ? focusSp.c.h * focusSp.scale : 0;
+      sys.glitch = Math.max(cueGlitch(t), post.glitch || 0) * 0.8;
+      // chunkier monitor pixels the bigger the spirit is on screen (about 3 px for a spirit 650 px tall)
+      const onScreen = fh * sys.world.scale.x / Q;
+      sys.setCell(Q * (["link"].includes(shot.id) || (shot.id === "strobe" && !focusSp) ? 5 : Math.min(12, Math.max(3, 3 * onScreen / 650))));
+      sys.frame(t, dt, ramp, { focus: focusSp ? { x: focusSp.root.x, y: focusSp.root.y + fh * 0.22, r: fh } : null });
+      app.renderer.render(app.stage);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(app.view, 0, 0);
+    }
+    if (front) front();
+    ctx.setTransform(Q, 0, 0, Q, 0, 0); ctx.filter = "none"; ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over";
+    if (post.found) foundFootage(ctx, t, frame, post.found, t > 9.4 && t < 11 ? 2.5 : 1);
+    else if (shot.id !== "morning" && shot.id !== "title" && shot.id !== "eulogy" && shot.id !== "bell" && !shot.id.startsWith("card")) { ctx.drawImage(vignette, 0, 0, W, H); grain(ctx, frame, 0.12); }
+    if (post.letter) letterbox(ctx, post.letter);
+    const g = Math.max(cueGlitch(t), post.glitch || 0);
+    glitchFrame(g, frame);
+    ctx.setTransform(Q, 0, 0, Q, 0, 0);
+    if (post.flash) { ctx.fillStyle = `rgba(255,255,255,${post.flash})`; ctx.fillRect(0, 0, W, H); }
+    if (post.fade) { ctx.fillStyle = `rgba(0,0,0,${post.fade})`; ctx.fillRect(0, 0, W, H); }
+  }
+
+  // ---------- render mode (frame capture) ----------
+  if (MODE === "render") {
+    let lastI = -1;
+    window.renderFrame = (i) => { if (i !== lastI + 1) { lastShot = null; } const t = i / FPS; render(t, 1 / FPS, i); lastI = i; return true; };
+    window.trailerReady = true;
+    return;
+  }
+
+  // ---------- live player ----------
+  const playBtn = document.getElementById("play"), toggle = document.getElementById("toggle"), scrub = document.getElementById("scrub"), clock = document.getElementById("clock");
+  const audio = new Audio(AUDIO); audio.preload = "auto";
+  let playing = false, t0 = 0, clockStart = 0, lastT = -1, frameNo = 0;
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function curT() { if (!playing) return t0; if (audio.readyState >= 2 && !audio.paused) return audio.currentTime; return t0 + (performance.now() - clockStart) / 1000; }
+  function draw(t) {
+    if (t < lastT - 0.05 || t - lastT > 0.5) { lastShot = null; }
+    const dt = lastT < 0 ? 1 / FPS : clamp(t - lastT, 0, 0.1);
+    render(t, dt || 1 / FPS, Math.floor(t * FPS)); lastT = t; frameNo++;
+    scrub.value = t.toFixed(2); clock.textContent = fmt(t);
+  }
+  function loop() {
+    if (!playing) return;
+    const t = curT();
+    if (t >= DUR) { pause(); t0 = 97.3; draw(t0); playBtn.hidden = false; playBtn.textContent = "Play again"; return; }
+    draw(t); requestAnimationFrame(loop);
+  }
+  async function play() {
+    playing = true; playBtn.hidden = true; toggle.textContent = "Pause";
+    if (t0 >= DUR - 0.1 || t0 === 97.3 && !audio.currentTime) t0 = 0;
+    audio.currentTime = t0; clockStart = performance.now();
+    try { await audio.play(); } catch (e) {}
+    lastT = -1; requestAnimationFrame(loop);
+  }
+  function pause() { t0 = curT(); playing = false; audio.pause(); toggle.textContent = "Play"; }
+  playBtn.addEventListener("click", play);
+  toggle.addEventListener("click", () => (playing ? pause() : play()));
+  scrub.addEventListener("input", () => { t0 = +scrub.value; audio.currentTime = t0; clockStart = performance.now(); lastT = -1; if (!playing) draw(t0); });
+  // poster: the title card, complete at rest
+  for (let i = 0; i < 30; i++) render(96.3 + i / 30, 1 / 30, i);
+  t0 = 97.3; draw(t0);
+})();
+</script>

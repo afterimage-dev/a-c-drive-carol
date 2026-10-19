@@ -1,0 +1,13 @@
+{
+  "name": "carol-core",
+  "version": "0.1.0",
+  "description": "A C-Drive Carol: the haunting manifest, sample files, scanner and Crypt.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=18.15" },
+  "scripts": {
+    "sample": "node make-sample.js",
+    "scan": "node scan.js",
+    "lines": "node manifest.js"
+  }
+}
