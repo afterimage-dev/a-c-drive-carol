@@ -18,6 +18,28 @@ const VOICES = {
 
 export const holdFor = (text) => 2400 + (text.length / 45) * 1000;
 
+/**
+ * Which words of a frightened line stutter, and after how many letters: Map(part index -> letters shown first).
+ * "you" and "your" usually do (it's him you're afraid of); about a third of other words of three letters or more;
+ * always at least one.
+ */
+export function stutterPlan(parts, random = Math.random) {
+  const plan = new Map(), candidates = [];
+  parts.forEach((part, i) => {
+    const letters = part.replace(/[^\p{L}]/gu, "");
+    if (letters.length < 3) return;
+    candidates.push(i);
+    const lead = part.length - part.replace(/^[^\p{L}]+/u, "").length;   // a leading quote mark comes with the first letter
+    const show = lead + (letters.length > 5 && random() < 0.4 ? 2 : 1);
+    if (/^you(r|rs)?$/i.test(letters) ? random() < 0.75 : random() < 0.33) plan.set(i, show);
+  });
+  if (!plan.size && candidates.length) {
+    const i = candidates[Math.floor(random() * candidates.length)];
+    plan.set(i, parts[i].length - parts[i].replace(/^[^\p{L}]+/u, "").length + 1);
+  }
+  return plan;
+}
+
 export class Dialogue {
   constructor(stage, sound, root) {
     this.stage = stage;
@@ -53,16 +75,24 @@ export class Dialogue {
     if (v.mode === "fade") { rest.textContent = ""; txt.textContent = text; }
     let risen = null, times = null;
     if (v.mode === "rise") {
-      // each word in its own span (and, when afraid, each letter, so it can tremble)
+      // each word in its own span (and, when afraid, each letter, so it can tremble and stutter)
       let li = 0;
       rest.textContent = "";
-      txt.innerHTML = text.split(/(\s+)/).filter(Boolean).map((part) => (/^\s+$/.test(part) ? part
-        : `<span class="w">${afraid ? [...part].map((ch) => `<span class="l" style="animation-delay:-${(li++ * 0.037) % 0.18}s">${esc(ch)}</span>`).join("") : esc(part)}</span>`)).join("");
+      const parts = text.split(/(\s+)/).filter(Boolean);
+      const stutters = afraid ? stutterPlan(parts) : new Map();
+      txt.innerHTML = parts.map((part, pi) => {
+        if (/^\s+$/.test(part)) return part;
+        if (!afraid) return `<span class="w">${esc(part)}</span>`;
+        const cut = stutters.get(pi) ?? Infinity;   // letters after the cut wait a beat
+        return `<span class="w">${[...part].map((ch, ci) => `<span class="l${ci >= cut ? " hid" : ""}" style="animation-delay:-${(li++ * 0.037) % 0.18}s">${esc(ch)}</span>`).join("")}</span>`;
+      }).join("");
       risen = [...txt.querySelectorAll(".w")];
-      // when each word arrives (ms): a steady 40 ms apart, or halting when afraid, catching breath at commas
+      // when each word arrives (ms): a steady 40 ms apart, or halting when afraid, catching breath at commas.
+      // A stuttered word shows its first letter or two, hangs, then completes, and the line waits for it.
       let at = 0;
       times = risen.map((w) => {
         const now = at;
+        if (w.querySelector(".hid")) { w.finishAt = now + 300 + Math.random() * 260; at = w.finishAt; }
         at += afraid ? 90 + Math.random() * 170 + (/[,;:\u2014]\W*$/.test(w.textContent) ? 380 : 0) + (Math.random() < 0.15 ? 320 : 0) : 40;
         return now;
       });
@@ -149,7 +179,7 @@ export class Dialogue {
   finish() {
     const L = this.line;
     if (!L) return;
-    if (L.words) L.words.forEach((w) => w.classList.add("in"));
+    if (L.words) L.words.forEach((w) => { w.classList.add("in"); w.finishAt = null; w.querySelectorAll?.(".hid").forEach((l) => l.classList.remove("hid")); });
     else { L.txt.textContent = L.text; if (L.rest) L.rest.textContent = ""; }
     L.done = true;
   }
@@ -173,7 +203,11 @@ export class Dialogue {
       } else if (L.v.mode === "rise") {
         L.elapsed += dt * 1000;
         while (L.n < L.words.length && L.times[L.n] <= L.elapsed) L.words[L.n++].classList.add("in");
-        if (L.n >= L.words.length) this.finish();
+        for (let i = 0; i < L.n; i++) {   // stuttered words complete a beat after they began
+          const w = L.words[i];
+          if (w.finishAt != null && w.finishAt <= L.elapsed) { w.querySelectorAll(".hid").forEach((l) => l.classList.remove("hid")); w.finishAt = null; }
+        }
+        if (L.n >= L.words.length && !L.words.some((w) => w.finishAt != null)) this.finish();
       } else if (L.v.mode === "words") {
         const before = Math.floor(L.n);
         L.n += dt * L.v.wps * 2;   // the list includes the spaces between words
