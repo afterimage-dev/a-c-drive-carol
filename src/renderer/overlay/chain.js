@@ -32,13 +32,14 @@ export class Chain {
    * @param {import("./stage.js").Puppet} puppet  Marlware
    * @param {object} o  { links, floorY, exts: file extensions for the pendants, sound }
    */
-  constructor(stage, puppet, { links = 34, floorY, exts = [".exe", ".zip", ".iso", "(1)"], sound = null, walls = true } = {}) {
+  constructor(stage, puppet, { links = 34, floorY, exts = [".exe", ".zip", ".iso", "(1)"], sound = null, walls = true, trail = -1 } = {}) {
     this.stage = stage;
     this.puppet = puppet;
     this.N = links;
     this.floorY = floorY ?? stage.H;
     this.sound = sound;
     this.walls = walls;   // the screen's sides stop the chain (off when it has to leave the screen)
+    this.trail = trail;   // which way the slack lies on the floor at first: -1 left, +1 right (behind him as he enters)
     this.exts = exts.length ? exts : [".tmp"];
     this.view = new PIXI.Container();
     stage.sys.world.addChild(this.view);
@@ -61,7 +62,8 @@ export class Chain {
   build() {
     const S = this.S = this.puppet.h;
     const { N } = this;
-    this.Lh = S * 0.09; this.P = this.Lh * 0.62; this.Lp = this.Lh * 1.75; this.Fk = (this.Lh * 1.35) / FILE.h; this.g = 8.2 * S;
+    // heavy: stronger gravity than a 1.2 m ghost would get, so it drops and drags rather than floats
+    this.Lh = S * 0.09; this.P = this.Lh * 0.62; this.Lp = this.Lh * 1.75; this.Fk = (this.Lh * 1.35) / FILE.h; this.g = 13 * S;
     const fileAt = [];
     for (let k = 7; k < N - 3; k += 8) fileAt.push(k);
     const count = this.count = N + 2 + fileAt.length;
@@ -72,19 +74,19 @@ export class Chain {
     const h0 = this.hand(), rc = P * 0.42;
     const place = (i, along) => {
       let y = h0.y + along, x = h0.x;
-      if (y > this.floorY - rc) { x -= (y - (this.floorY - rc)); y = this.floorY - rc; }
+      if (y > this.floorY - rc) { x += this.trail * (y - (this.floorY - rc)); y = this.floorY - rc; }
       X[i] = PX[i] = Math.max(rc, x); Y[i] = PY[i] = y;
     };
     for (let i = 0; i <= N; i++) { place(i, i * P); IM[i] = i === 0 ? 0 : 1; R[i] = rc; }
     this.pend = [];
     let idx = N + 1;
-    place(idx, N * P + Lp * 0.46); IM[idx] = 1 / 4; R[idx] = Lp * 0.36;
+    place(idx, N * P + Lp * 0.46); IM[idx] = 1 / 7; R[idx] = Lp * 0.36;
     this.pend.push({ i: idx, at: N, kind: "lock", rest: Lp * 0.46 });
     fileAt.forEach((at, n) => {
       idx++;
       const rest = (FILE.h / 2 + 7.9) * Fk;
       X[idx] = PX[idx] = X[at] + 2; Y[idx] = PY[idx] = Y[at] + rest;
-      IM[idx] = 1 / 1.6; R[idx] = FILE.h * Fk * 0.36;
+      IM[idx] = 1 / 2.5; R[idx] = FILE.h * Fk * 0.36;
       this.pend.push({ i: idx, at, kind: "file", rest, ext: this.exts[n % this.exts.length] });
     });
     this.IM0 = IM.slice();
@@ -141,7 +143,7 @@ export class Chain {
 
   step(dt, silent) {
     const { X, Y, PX, PY, IM, R, N, P, S, count, pairs } = this;
-    const air = Math.exp(-0.6 * dt), gg = this.g * dt * dt, W = this.stage.W, floorY = this.floorY;
+    const air = Math.exp(-2.2 * dt), gg = this.g * dt * dt, W = this.stage.W, floorY = this.floorY;
     for (let i = 0; i < count; i++) {
       if (IM[i] === 0) continue;
       const vx = (X[i] - PX[i]) * air, vy = (Y[i] - PY[i]) * air;
@@ -159,8 +161,12 @@ export class Chain {
       for (let i = 0; i < N - 1; i++) this.solveMin(i, i + 2, minSkip);
     }
     const thr = 0.55 * S * dt;
+    // links only collide with each other near the floor, where they pile up. In the air they pass freely, so a
+    // flung chain can never jam into a knot round his hand: it always falls.
+    const pileTop = floorY - this.Lh * 3;
     for (let k = 0; k < pairs.length; k += 2) {
       const a = pairs[k], b = pairs[k + 1], rs = R[a] + R[b];
+      if (Y[a] < pileTop || Y[b] < pileTop) continue;
       const dx = X[b] - X[a]; if (dx > rs || dx < -rs) continue;
       const dy = Y[b] - Y[a]; if (dy > rs || dy < -rs) continue;
       const d2 = dx * dx + dy * dy; if (d2 >= rs * rs) continue;
@@ -173,7 +179,7 @@ export class Chain {
       PX[a] += (X[a] - PX[a]) * 0.03 * (IM[a] > 0); PY[a] += (Y[a] - PY[a]) * 0.03 * (IM[a] > 0);
       PX[b] += (X[b] - PX[b]) * 0.03 * (IM[b] > 0); PY[b] += (Y[b] - PY[b]) * 0.03 * (IM[b] > 0);
     }
-    const mu = 0.55 * this.g * dt * dt;
+    const mu = 0.85 * this.g * dt * dt;
     for (let i = 1; i < count; i++) {
       if (IM[i] === 0) continue;
       const r = R[i], lim = floorY - r;

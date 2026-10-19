@@ -34,7 +34,11 @@ stage.app.ticker.add(() => {
   frames++;
   const now = performance.now();
   if (now - since < 5000) return;
-  if (run?.ctx.settings.dev) carol.log(`${run.kind}: ${(frames * 1000 / (now - since)).toFixed(0)} fps at ${stage.W}x${stage.H}@${devicePixelRatio}x, cell ${stage.sys.cell}`);
+  if (run?.ctx.settings.dev) {
+    const lv = sound.level();
+    carol.log(`${run.kind}: ${(frames * 1000 / (now - since)).toFixed(0)} fps at ${stage.W}x${stage.H}@${devicePixelRatio}x, cell ${stage.sys.cell}` +
+      (lv ? ` · sound ${lv.theme} peak ${lv.peak.toFixed(2)} rms ${lv.rms.toFixed(3)}` : ""));
+  }
   frames = 0; since = now;
 });
 let hovering = false;

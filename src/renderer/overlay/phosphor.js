@@ -222,8 +222,8 @@
         let lookX = 0;
         if (S.look) { const l = this.body.toLocal(new PIXI.Point(S.look.x, S.look.y), world); lookX = clamp((l.x - c.neck[0]) / 400, -1, 1); }
         return {
-          a: S.nod * 0.32 + m.tilt * Math.sin(s * 0.7) + m.tilt * 0.5 * Math.sin(s * 1.9) + S.open * 0.03 * Math.sin(tt * 9) + S.laugh * 0.07 * Math.sin(tt * 16) - clamp(S.vx * 0.00035, -0.14, 0.14) * S.facing + lookX * 0.05,
-          ox: lookX * 7 - clamp(S.vx * 0.015, -14, 14) * S.facing, oy: S.nod * 14 + Math.sin(s * 1.55 + 0.6) * 1.6 + S.laugh * 3 * Math.abs(Math.sin(tt * 9))
+          a: S.nod * 0.05 + m.tilt * Math.sin(s * 0.7) + m.tilt * 0.5 * Math.sin(s * 1.9) + S.open * 0.03 * Math.sin(tt * 9) + S.laugh * 0.07 * Math.sin(tt * 16) - clamp(S.vx * 0.00035, -0.14, 0.14) * S.facing + lookX * 0.05,
+          ox: lookX * 7 - clamp(S.vx * 0.015, -14, 14) * S.facing, oy: S.nod * 7 + Math.sin(s * 1.55 + 0.6) * 1.6 + S.laugh * 3 * Math.abs(Math.sin(tt * 9))
         };
       }
       update(t, dt) {
@@ -266,7 +266,7 @@
           if (local) { lx = local.x - cx; ly = local.y - cy; const len = Math.hypot(lx, ly) || 1, reach = Math.min(1, len / 220); lx = lx / len * reach; ly = ly / len * reach; }
           const rx = c.eyeR[0] * flare, ry = c.eyeR[1] * flare;
           p.socket.position.set(cx, cy); p.socket.width = c.eyeR[0] * 2.5; p.socket.height = c.eyeR[1] * 2.5;
-          p.halo.position.set(cx, cy); p.halo.width = rx * 5; p.halo.height = ry * 5 * (0.5 + open * 0.5); p.halo.alpha = (0.8 + 0.2 * Math.sin(t * 2.2)) * (0.7 + S.flare * 0.3);
+          p.halo.position.set(cx, cy); p.halo.width = rx * 5; p.halo.height = ry * 5 * (0.5 + open * 0.5); p.halo.alpha = (0.8 + 0.2 * Math.sin(t * 2.2)) * (0.7 + S.flare * 0.3) * (0.15 + 0.85 * S.eyesOpen);
           p.disc.position.set(cx, cy); p.disc.width = rx * 2.3; p.disc.height = ry * 2.3 * open;
           p.core.position.set(cx + lx * rx * 0.4, cy + ly * ry * 0.4 * open); p.core.width = rx * 1.15; p.core.height = ry * 1.15 * open;
         });

@@ -113,6 +113,7 @@ export async function past(ctx) {
 
   stage.ramp = "past";
   stage.setCellFor(H * 0.55);
+  sound.music("past");
   const sp = stage.summon("past", { home: [0.5, 0.42], height: 0.5, wander: [0.04, 0.015], flip: true, alpha: 0 });
   sp.s.halo = 0.99;
   sound.whoosh(1.8, 0.06);
@@ -171,6 +172,7 @@ export async function past(ctx) {
   }
 
   // he smiles, and dissolves into pixels
+  sound.music(null);
   sp.s.pRate = 8;
   stage.glitch(0.3, 0.6);
   sp.fadeTo(0, 1.8);

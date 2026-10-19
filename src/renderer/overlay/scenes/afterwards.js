@@ -58,7 +58,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
   const backdrop = ctx.backdrop = new Backdrop(stage);
   await backdrop.show(bytes);
   const stopCandle = candle(stage);
-  ui.appendChild(el("div", "esc-hint", "Esc to wake"));
+  ui.appendChild(el("div", "esc-hint", "Click or Space to go on · Esc to wake"));
   backdrop.set({ dim: 0.62, flicker: 0.5, frost: 0.3, warp: 4 }, { dim: 0.4, frost: 0.05, warp: 1 });
   await wait(1200, signal);
 
@@ -66,6 +66,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
     const g = night.present.groups[0];
     stage.ramp = "present";
     stage.setCellFor(stage.H * 0.56);
+    sound.music("present");
     const sp = stage.summon("present", { home: [0.5, 0.38], height: 0.56, wander: [0.03, 0.02], alpha: 0 });
     sp.sp.setTwins(Math.min(6, g.files.length - 1));
     sp.fadeTo(1, 1); stage.glitch(0.3);
@@ -94,6 +95,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
     const f = night.past[0];
     stage.ramp = "past";
     stage.setCellFor(stage.H * 0.5);
+    sound.music("past");
     const sp = stage.summon("past", { home: [0.5, 0.4], height: 0.5, wander: [0.04, 0.015], flip: true, alpha: 0 });
     sp.s.halo = 0.99;
     sp.fadeTo(1, 1.4); stage.glitch(0.3);
@@ -108,6 +110,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
     sp.remove();
   }
 
+  sound.music(null);
   backdrop.set({ dim: 0.3, frost: 0, warp: 0, flicker: 0 }, { dim: 0.5, frost: 0.3, warp: 4, flicker: 1 });
   const panel = review(ctx, ctx.decisions.lists());
   const ticked = await panel.wake();

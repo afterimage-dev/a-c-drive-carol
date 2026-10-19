@@ -25,7 +25,7 @@ export class Dialogue {
     this.card.setAttribute("aria-live", "polite");
     root.appendChild(this.card);
     this.line = null;
-    this.frozen = false;   // while choices are showing, lines don't move on by themselves
+    this.frozen = false;   // while your replies are showing, lines don't move on by themselves
     this.autoplay = false; // development: choose for the user
     stage.addAlways((t, dt) => this.step(dt));
   }
@@ -35,12 +35,12 @@ export class Dialogue {
    * @param {string} text
    * @param {object} o  { voice, who, puppet, at: "head" | "top" | "bottom" | "centre", hold (ms), signal, linger }
    */
-  async say(text, { voice = "marl", who, puppet = null, at, hold, signal, linger = false } = {}) {
+  async say(text, { voice = "marl", who, puppet = null, at, hold, signal, linger = false, afraid = false } = {}) {
     if (!text) return;
     const v = VOICES[voice] || VOICES.marl;
     if (v.quote) text = `\u201C${text}\u201D`;
     const card = this.card;
-    card.className = `card v-${voice}`;
+    card.className = `card v-${voice}${afraid ? " afraid" : ""}`;
     const label = who ?? v.who;
     const words = v.mode === "words" ? text.split(/(\s+)/).filter(Boolean) : null;
     card.innerHTML = (label ? `<span class="who">${esc(label)}</span>` : "") +
@@ -48,7 +48,11 @@ export class Dialogue {
         : `<span class="txt"><span class="typed"></span><span class="rest">${esc(text)}</span></span>`);   // the untyped rest keeps the card its final size
     const txt = card.querySelector(v.mode === "type" ? ".typed" : ".txt");
     const rest = card.querySelector(".rest");
-    if (v.mode === "fade") { rest.textContent = ""; txt.textContent = text; }
+    if (v.mode === "fade") {
+      rest.textContent = "";
+      if (afraid) txt.innerHTML = [...text].map((ch, i) => (ch === " " ? " " : `<span class="l" style="animation-delay:-${(i * 0.037) % 0.18}s">${esc(ch)}</span>`)).join("");
+      else txt.textContent = text;
+    }
     this.line = { text, v, voice, puppet, at: at || v.at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: words ? [...txt.querySelectorAll(".w")] : null, resolve: null };
     requestAnimationFrame(() => card.classList.add("on"));
     this.place();
@@ -60,40 +64,53 @@ export class Dialogue {
     }
   }
 
-  /** Buttons under the current card (or at `at`), resolving with the chosen key. */
-  async choose(options, { signal, className = "", auto = null } = {}) {
-    const row = el("div", `choices ${className}`);
-    options.forEach(([key, label, primary]) => {
-      const b = el("button", primary ? "primary" : "", esc(label));
+  /**
+   * Your possible replies, in your own voice: quoted lines low on the left, as if you're about to say one.
+   * The one you pick stays a moment, as said; the others fade. Resolves with its key.
+   */
+  async reply(options, { signal, auto = null } = {}) {
+    const box = el("div", "replies interactive");
+    options.forEach(([key, label]) => {
+      const b = el("button", "reply", esc(`\u201C${label}\u201D`));
       b.type = "button";
       b.dataset.key = key;
-      row.appendChild(b);
+      box.appendChild(b);
     });
-    this.card.appendChild(row);
-    this.card.classList.add("on", "interactive");
-    this.frozen = true;
-    this.place();
+    const floor = this.stage.floorY ?? this.stage.H;
+    box.style.left = `${Math.round(this.stage.W * 0.06)}px`;
+    box.style.bottom = `${Math.round(this.stage.H - floor + this.stage.H * 0.07)}px`;
+    this.root.appendChild(box);
+    requestAnimationFrame(() => box.classList.add("on"));
+    this.frozen = true;   // the spirit's line waits for your answer
     try {
-      return await until((resolve) => {
-        row.addEventListener("click", (e) => {
+      const key = await until((resolve) => {
+        box.addEventListener("click", (e) => {
           const b = e.target.closest("button");
-          if (b) { e.stopPropagation(); this.sound.clink(0.3, 0, 0.3); resolve(b.dataset.key); }
+          if (!b || box.classList.contains("said")) return;
+          e.stopPropagation();
+          this.sound.clink(0.3, -0.4, 0.3);
+          b.classList.add("chosen");
+          box.classList.add("said");
+          resolve(b.dataset.key);
         });
-        if (this.autoplay) setTimeout(() => resolve(auto ?? options.find((o) => o[2])?.[0] ?? options[0][0]), 1500);
+        if (this.autoplay) setTimeout(() => box.querySelector(`[data-key="${auto ?? options[0][0]}"]`)?.click(), 1500);
       }, signal);
+      await wait(900, signal);
+      return key;
     } finally {
       this.frozen = false;
-      row.remove();
-      this.card.classList.remove("interactive");
+      box.classList.remove("on");
+      setTimeout(() => box.remove(), 600);
     }
   }
 
-  /** Say a line and offer buttons beneath it in one card. */
+  /** A spirit's line, then your replies to it. The line stays up while you choose. */
   async ask(text, options, o = {}) {
     const said = this.say(text, { ...o, linger: true, hold: Infinity });
     said.catch(() => {});
     await this.typed(o.signal);
-    const answer = await this.choose(options, o);
+    await wait(this.line?.v.mode === "words" ? 1100 : 600, o.signal);   // let the last words surface, and be read
+    const answer = await this.reply(options, o);
     this.advance(true);
     await said;
     this.card.classList.remove("on");

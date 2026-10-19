@@ -41,6 +41,7 @@ export class Puppet {
     this.M = { x: stage.W * home[0], y: stage.H * home[1], vx: 0, vy: 0, lean: 0 };
     this.fade = null;
     this.t0 = Math.random() * 50;
+    this.sp.place(this.M.x, this.M.y, this.h, facing);
     stage.sys.spirits.addChild(this.sp.root);
   }
 
@@ -49,7 +50,8 @@ export class Puppet {
 
   moveTo(x, y, k = 5, d = 3) { this.target = [x, y]; this.k = k; this.d = d; }
   roam() { this.target = null; this.k = 5; this.d = 3; }
-  jump(x, y) { this.M.x = x; this.M.y = y; this.M.vx = this.M.vy = 0; }
+  /** Put the spirit somewhere at once (and really there, so anything attached to it, like the chain, starts right). */
+  jump(x, y) { this.M.x = x; this.M.y = y; this.M.vx = this.M.vy = 0; this.sp.place(x, y, this.h, this.s.facing); }
 
   fadeTo(alpha, seconds = 1) { this.fade = { from: this.s.alpha, to: alpha, t: 0, dur: Math.max(0.01, seconds) }; }
 

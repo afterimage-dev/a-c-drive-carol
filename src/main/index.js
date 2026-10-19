@@ -20,6 +20,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --link           leave the morning-after chain link out (with --capture, pictures are taken of it)
 //   --wisp=PATH      pretend PATH (in --roots) was banished 30 days ago, so its wisp returns
 //   --profile=DIR    keep settings in DIR instead of the real profile (for test runs)
+//   --fling          in the warning, whirl the chain round his hand and let go (to check it always falls)
 //   --esc-at=N       press Esc N seconds into a visit (to check that nothing is applied)
 //   --demo=real      start a real-mode night at once  --roots=DIR  scan DIR\Downloads, \Desktop, \Documents instead of yours
 const argv = process.argv.slice(1);
@@ -41,6 +42,7 @@ const flags = {
   omen: devAllowed ? value("omen") : null,
   setup: !!flag("setup"),
   link: devAllowed && !!flag("link"),
+  fling: devAllowed && !!flag("fling"),
   wisp: devAllowed ? value("wisp") : null,
   escAt: devAllowed ? Number(value("esc-at")) || null : null,
   hidden: !!flag("hidden")

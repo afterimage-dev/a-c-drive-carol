@@ -25,9 +25,15 @@ body.visit #stage canvas { cursor: default; }
 .v-marl { font-family: var(--display); font-size: 19px; line-height: 1.38; border-color: rgba(168, 238, 242, .42); } .v-marl .who { color: var(--marl); }
 .v-past { font-family: var(--past-face); font-style: italic; font-weight: 300; font-size: 23px; line-height: 1.28; color: #fff1d6; border-color: rgba(255, 179, 71, .42); } .v-past .who { color: var(--past); }
 .v-present { font-family: var(--present-face); font-size: 23px; line-height: 1.24; color: #c9ffca; border-color: rgba(157, 255, 159, .42); } .v-present .who { color: var(--present); }
-/* your own lines: no card, large and in quotes, low on the left, as if spoken from your chair */
-.card.v-you { font-family: var(--body); font-style: italic; font-size: clamp(26px, 2.3vw, 38px); line-height: 1.28; color: #f3f0fb; max-width: min(58vw, 980px);
-  background: none; border: 0; box-shadow: none; padding: 0; text-shadow: 0 2px 4px rgba(0, 0, 0, .7), 0 0 28px rgba(0, 0, 0, .85); transition: opacity .7s; }
+/* your own lines and replies: large and in quotes, low on the left, as if spoken from your chair. A feathered dark
+   panel and a heavy shadow keep them readable over any window. */
+:root { --you-size: clamp(34px, 3vw, 52px); --you-shadow: 0 3px 2px rgba(0, 0, 0, .55), 0 4px 14px rgba(0, 0, 0, .9), 0 0 40px rgba(0, 0, 0, .8); }
+.card.v-you { font-family: var(--body); font-style: italic; font-size: var(--you-size); line-height: 1.24; color: #f6f3fd; max-width: min(62vw, 1100px);
+  background: rgba(6, 6, 11, .56); border: 0; border-radius: 18px; padding: 14px 26px 18px; box-shadow: 0 0 46px 26px rgba(6, 6, 11, .5);
+  backdrop-filter: blur(5px); text-shadow: var(--you-shadow); transition: opacity .7s; }
+/* afraid: every letter trembles */
+.card.v-you.afraid .l { display: inline-block; animation: tremble .18s steps(2) infinite; }
+@keyframes tremble { 0% { transform: translate(0, 0); } 25% { transform: translate(.6px, -.8px) rotate(.6deg); } 50% { transform: translate(-.8px, .5px); } 75% { transform: translate(.5px, .9px) rotate(-.5deg); } 100% { transform: translate(-.4px, -.4px); } }
 .v-narrator { font-family: var(--display); font-style: italic; font-size: 21px; line-height: 1.4; text-align: center; max-width: min(84vw, 560px); border-color: rgba(255, 241, 214, .3); }
 .v-tiny { font-family: var(--tiny); font-weight: 300; font-size: 14px; color: #dfe6ea; border-color: rgba(223, 230, 234, .25); } .v-tiny .who { color: #b9c4ca; }
 .v-past .w { opacity: 0; filter: blur(4px); transition: opacity .7s ease, filter .7s ease; }
@@ -35,6 +41,19 @@ body.visit #stage canvas { cursor: default; }
 .v-past .w.in, .v-present .w.in { opacity: 1; filter: none; transform: none; }
 .shake { animation: shake .45s; }
 @keyframes shake { 0%, 100% { translate: 0 0; } 20% { translate: -5px 1px; } 40% { translate: 5px -1px; } 60% { translate: -3px 0; } 80% { translate: 3px 1px; } }
+
+/* your replies: the same voice as your lines, offered as quotes to choose between */
+.replies { position: absolute; display: grid; justify-items: start; gap: 4px; max-width: min(62vw, 1100px); opacity: 0; transition: opacity .5s;
+  background: rgba(6, 6, 11, .6); border-radius: 18px; padding: 12px 26px 14px; box-shadow: 0 0 46px 26px rgba(6, 6, 11, .5); backdrop-filter: blur(5px); }
+.replies.on { opacity: 1; }
+.replies.said { background: transparent; box-shadow: none; backdrop-filter: none; transition: opacity .5s, background .5s, box-shadow .5s; }
+.replies .reply { font-family: var(--body); font-style: italic; font-size: var(--you-size); line-height: 1.22; letter-spacing: 0; color: rgba(246, 243, 253, .78);
+  background: none; border: 0; border-radius: 6px; padding: 2px 10px 4px; margin-left: -10px; text-align: left; cursor: pointer;
+  text-shadow: var(--you-shadow); transition: color .2s, opacity .4s, transform .2s; }
+.replies .reply:hover, .replies .reply:focus-visible { color: #fff; transform: translateX(6px); outline: none; }
+.replies .reply:focus-visible { text-decoration: underline; text-underline-offset: 6px; }
+.replies.said .reply { opacity: 0; pointer-events: none; }
+.replies.said .reply.chosen { opacity: 1; color: #fff; transform: none; }
 
 /* ---------- buttons ---------- */
 .choices { display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 12px; }
@@ -122,4 +141,5 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
   .card, .title-card, .file, .copy, .review, .dock, .tally { transition: none; }
   .v-past .w, .v-present .w { transition: none; filter: none; transform: none; }
   .shake { animation: none; }
+  .card.v-you.afraid .l { animation: none; }
 }

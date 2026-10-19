@@ -37,7 +37,7 @@ export async function visit(ctx, { backdrop: bytes }) {
   ctx.backdrop = new Backdrop(stage);
   await ctx.backdrop.show(bytes);
   const stopCandle = candle(stage);
-  ui.appendChild(el("div", "esc-hint", "Esc to wake"));
+  ui.appendChild(el("div", "esc-hint", "Click or Space to go on · Esc to wake"));
   if (night.simulated) ui.appendChild(el("div", "sample-tag", "Sample files"));
 
   const start = Math.max(0, ORDER.indexOf(ctx.settings.startAt || "bell"));

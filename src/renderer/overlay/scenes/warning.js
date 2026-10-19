@@ -33,7 +33,19 @@ export async function warning(ctx) {
 
   marl.fadeTo(1, 1.4);
   sound.clink(0.5, 0.7);
+  sound.music("marl", { level: 0.55 });   // quieter: your desktop isn't dimmed for a warning
   await wait(1500, signal);
+  if (ctx.settings.fling) {   // development: whirl a link round his hand, then let go
+    const ptr = stage.ptr, hand = chain.hand();
+    chain.take(12);
+    const start = performance.now();
+    const off = stage.add(() => {
+      const k = (performance.now() - start) / 1000;
+      ptr.x = hand.x + Math.cos(k * 9) * h * 0.55; ptr.y = hand.y + Math.sin(k * 9) * h * 0.55;
+    });
+    await wait(2500, signal);
+    off(); chain.drop();
+  }
 
   const lines = night.marlware.opening;
   for (let i = 0; i < lines.length - 1; i++) {
@@ -65,5 +77,6 @@ export async function warning(ctx) {
   }
   shadeOff();
   chain.remove();
+  sound.music(null);
   ctx.carol.done("warning");
 }

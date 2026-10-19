@@ -2,6 +2,19 @@
 // Recipes follow trailer/soundtrack.py (bell, clinks, wind, grind, birdsong) so the app and the trailer match.
 
 const rnd = (a, b) => a + Math.random() * (b - a);
+const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
+
+// Background themes: slow, long tones rather than melodies, one character per spirit. Each chord swells in over a few
+// seconds and overlaps the next, so it never quite moves. Yet to Come has none: only the wind.
+//   chords: MIDI notes · dur: seconds per chord · wave: oscillator · cutoff: lowpass Hz · sway: a lilting pulse
+const THEMES = {
+  // Jacob Marlware: cold and low, a minor drone that shifts without resolving
+  marl: { chords: [[38, 45, 50, 53], [38, 45, 48, 52], [36, 43, 50, 51], [38, 45, 50, 53]], dur: 11, wave: "sine", wave2: "triangle", cutoff: 900, gain: 0.5, attack: 4, glass: 74 },
+  // the Ghost of Downloads Past: warm and wistful, open chords that drift like a half-remembered afternoon
+  past: { chords: [[53, 57, 60, 64], [48, 55, 62, 64], [45, 52, 55, 60], [43, 50, 57, 60]], dur: 9, wave: "triangle", wave2: "sine", cutoff: 1500, gain: 0.42, attack: 3, vibrato: 4.2, glass: 76 },
+  // the Ghost of Filesystems Present: jovial, bright major chords on a reedy organ, swaying like a full table
+  present: { chords: [[43, 50, 55, 59, 62], [48, 55, 60, 64], [43, 50, 59, 62, 67], [50, 57, 62, 66]], dur: 4.6, wave: "sawtooth", wave2: "triangle", cutoff: 1700, gain: 0.3, attack: 1.2, sway: { rate: 1.35, depth: 0.32 } }
+};
 
 export class Sound {
   constructor() {
@@ -15,6 +28,7 @@ export class Sound {
     this.enabled = sound !== false;
     if (typeof volume === "number") this.volume = volume;
     if (this.master) this.master.gain.setTargetAtTime(this.enabled ? this.volume : 0, this.ac.currentTime, 0.1);
+    if (!this.enabled && this.theme) this.music(null);
   }
 
   ensure() {
@@ -33,6 +47,17 @@ export class Sound {
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this.noise = nb;
     return ac;
+  }
+
+  /** Development: how loud the output is right now (peak and RMS, 0..1), to check nothing is silent or clipping. */
+  level() {
+    if (!this.ac) return null;
+    if (!this.meter) { this.meter = this.ac.createAnalyser(); this.meter.fftSize = 2048; this.master.connect(this.meter); }
+    const d = new Float32Array(this.meter.fftSize);
+    this.meter.getFloatTimeDomainData(d);
+    let peak = 0, sum = 0;
+    for (const x of d) { peak = Math.max(peak, Math.abs(x)); sum += x * x; }
+    return { peak, rms: Math.sqrt(sum / d.length), theme: this.theme?.name || "-" };
   }
 
   /** An output bus: dry to the master, `send` to the reverb, panned. */
@@ -180,8 +205,73 @@ export class Sound {
     for (let k = 0; k < 6; k++) setTimeout(() => this.grind(), k * 60 + Math.random() * 40);
   }
 
+  /** Change the background theme ("marl" | "past" | "present" | null), crossfading over a few seconds. */
+  music(name, { level = 1 } = {}) {
+    if (!this.enabled && name) return;
+    if (!name && !this.theme) return;
+    if (this.theme?.name === name) { this.theme.bus.gain.setTargetAtTime(this.theme.base * level, this.ac.currentTime, 1.2); return; }
+    const ac = this.ensure();
+    if (this.theme) {   // let the old one fade away under the new
+      const old = this.theme;
+      clearTimeout(old.timer);
+      old.bus.gain.cancelScheduledValues(ac.currentTime);
+      old.bus.gain.setTargetAtTime(0, ac.currentTime, 1.4);
+      old.stopAll(ac.currentTime + 7);
+      this.theme = null;
+    }
+    const T = THEMES[name];
+    if (!T) return;
+    const bus = ac.createGain();
+    bus.gain.value = 0;
+    const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = T.cutoff; lp.Q.value = 0.4;
+    // the filter breathes slowly, so held chords never sound static
+    const breath = ac.createOscillator(), breathDepth = ac.createGain();
+    breath.frequency.value = 0.07; breathDepth.gain.value = T.cutoff * 0.25; breath.connect(breathDepth); breathDepth.connect(lp.frequency); breath.start();
+    let into = lp;
+    const nodes = [breath];
+    if (T.sway) {   // a lilting swell and ebb, for the Present
+      const sway = ac.createGain(); sway.gain.value = 1 - T.sway.depth;
+      const lfo = ac.createOscillator(), d = ac.createGain(); lfo.frequency.value = T.sway.rate; d.gain.value = T.sway.depth;
+      lfo.connect(d); d.connect(sway.gain); lfo.start(); nodes.push(lfo);
+      sway.connect(lp); into = sway;
+    }
+    const out = this.out(1, 0, 0.6);
+    lp.connect(bus); bus.connect(out);
+    const base = T.gain * 0.36;
+    bus.gain.setTargetAtTime(base * level, ac.currentTime, 1.6);
+    const voices = [];
+    const theme = this.theme = {
+      name, bus, base, timer: null, i: 0,
+      stopAll: (when) => { for (const v of voices) try { v.stop(when); } catch { /* already stopped */ } nodes.forEach((n) => { try { n.stop(when); } catch { /* done */ } }); }
+    };
+    const play = () => {
+      if (this.theme !== theme) return;
+      const t = ac.currentTime + 0.05, chord = T.chords[theme.i++ % T.chords.length], len = T.dur + T.attack * 1.6;
+      for (const note of chord) {
+        for (const [wave, detune, amp] of [[T.wave, -6, 0.6], [T.wave2, 5, 0.5]]) {
+          const o = ac.createOscillator(), g = ac.createGain();
+          o.type = wave; o.frequency.value = hz(note); o.detune.value = detune + rnd(-3, 3);
+          if (T.vibrato) { const v = ac.createOscillator(), vd = ac.createGain(); v.frequency.value = T.vibrato * rnd(0.9, 1.1); vd.gain.value = 4; v.connect(vd); vd.connect(o.detune); v.start(t); v.stop(t + len + 0.2); voices.push(v); }
+          const peak = amp / chord.length * (note < 48 ? 1.2 : 1);
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + T.attack); g.gain.setValueAtTime(peak, t + T.dur); g.gain.linearRampToValueAtTime(0, t + len);
+          o.connect(g); g.connect(into); o.start(t); o.stop(t + len + 0.1); voices.push(o);
+        }
+      }
+      if (T.glass && theme.i % 2 === 0) {   // now and then a faint high tone, like a finger round a glass
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.frequency.value = hz(T.glass + (theme.i % 4 === 0 ? 0 : 7));
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + T.dur * 0.5); g.gain.linearRampToValueAtTime(0, t + T.dur * 1.2);
+        o.connect(g); g.connect(out); o.start(t); o.stop(t + T.dur * 1.2 + 0.1); voices.push(o);
+      }
+      while (voices.length > 200) voices.shift();
+      theme.timer = setTimeout(play, T.dur * 1000);
+    };
+    play();
+  }
+
   stopAll() {
     this.scrape(0);
     this.wind(false);
+    this.music(null);
   }
 }

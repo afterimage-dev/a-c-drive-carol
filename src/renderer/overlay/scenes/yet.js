@@ -2,7 +2,7 @@
 // falls silent but the wind, and a gravestone rises to carve the month your drive will be full. If you chose
 // anything tonight, a second, later date carves itself beneath.
 
-import { title, dock } from "../ui.js";
+import { title } from "../ui.js";
 import { Stone } from "../stone.js";
 import { wait, tween } from "../util.js";
 
@@ -11,6 +11,7 @@ export async function yet(ctx) {
   const { W, H } = stage;
   await title(ctx, "Stave Four", "The Last of the Spirits");
 
+  sound.music(null);   // nothing for him but the wind
   sound.wind(true);
   backdrop.set({ dim: 0.86, flicker: 0.25 }, { dim: 0.12 });
   stage.ramp = "yet";
@@ -24,7 +25,7 @@ export async function yet(ctx) {
   stone.layout({ x: W * 0.72, baseY: (ctx.floorY ?? H) + 6, size: 0.44 });
   await wait(3600, signal);
 
-  const think = (text) => talk.say(text, { voice: "you", signal, hold: 2600 + text.length * 30 });
+  const think = (text) => talk.say(text, { voice: "you", signal, hold: 2600 + text.length * 30, afraid: true });   // you are afraid of him
   await think("I fear you more than any spectre I have seen.");
   await think("You are about to show me the shadows of the drive that will be?");
   await wait(1400, signal);   // no answer
@@ -51,12 +52,8 @@ export async function yet(ctx) {
   }
   await wait(1200, signal);
 
-  const bar = dock(ctx, "", [["wake", queued > 0 ? "I will keep my drive in my heart, and tidy it all the year" : "Wake", true]], { accent: "#a194de" });
-  bar.el.querySelector("span").remove();
-  bar.el.style.paddingLeft = "8px";
-  if (ctx.settings.autoplay) setTimeout(() => bar.el.querySelector("button").click(), 2000);
-  await Promise.race([bar.choice(), wait(1e9, signal)]);
-  bar.hide();
+  // your vow, in your own voice (or, if you chose nothing, simply waking)
+  await talk.reply([["wake", queued > 0 ? "I will keep my drive in my heart, and tidy it all the year." : "Wake."]], { signal });
 
   // he shrinks, collapses, and dwindles into your cursor
   arm();

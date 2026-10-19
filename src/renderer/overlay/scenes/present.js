@@ -12,6 +12,7 @@ export async function present(ctx) {
 
   stage.ramp = "present";
   stage.setCellFor(H * 0.58);
+  sound.music("present");
   const sp = stage.summon("present", { home: [0.5, 0.38], height: 0.56, wander: [0.03, 0.02], flip: false, alpha: 0 });
   const groups = night.present.groups;
   sp.sp.setTwins(1);
@@ -85,6 +86,7 @@ export async function present(ctx) {
     tally.classList.remove("on");
     setTimeout(() => tally.remove(), 500);
   }
+  sound.music(null);
   sp.fadeTo(0, 1.4);
   stage.glitch(0.35);
   await wait(1600, signal);
