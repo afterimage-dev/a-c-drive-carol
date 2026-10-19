@@ -26,6 +26,16 @@ function softTexture() {
 }
 
 let run = null;   // { kind, ctx, ac }
+
+// development: report the frame rate while something is on screen
+let frames = 0, since = performance.now();
+stage.app.ticker.add(() => {
+  frames++;
+  const now = performance.now();
+  if (now - since < 5000) return;
+  if (run?.ctx.settings.dev) carol.log(`${run.kind}: ${(frames * 1000 / (now - since)).toFixed(0)} fps at ${stage.W}x${stage.H}@${devicePixelRatio}x, cell ${stage.sys.cell}`);
+  frames = 0; since = now;
+});
 let hovering = false;
 
 function makeCtx(kind, payload, signal) {

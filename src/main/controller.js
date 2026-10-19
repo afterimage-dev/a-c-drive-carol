@@ -189,6 +189,7 @@ export class Controller {
     await delay(250);   // let Windows take the overlay off the screen before the picture is taken
     const backdrop = this.flags.noBackdrop ? null : await captureDesktop();
     await this.overlay.visit();
+    if (this.flags.escAt) setTimeout(() => { console.log("Pressing Esc"); this.onEsc(); console.log("Scheduler after Esc:", JSON.stringify({ phase: this.sched.phase, fled: this.sched.fled })); }, this.flags.escAt * 1000);
     this.overlay.send("scene", { name: "visit", night: this.night, icons: this.icons, backdrop: backdrop ? new Uint8Array(backdrop) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
     this.capture();
   }

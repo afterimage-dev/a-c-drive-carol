@@ -17,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --answer=X       with --autoplay, answer Marlware with X (here | notTonight | now)
 //   --omen=X         show one omen on the sample files (passing | cold | rattle | notification)
 //   --setup          open the settings window (with --capture, pictures are taken of it)
+//   --esc-at=N       press Esc N seconds into a visit (to check that nothing is applied)
 const argv = process.argv.slice(1);
 const flag = (name) => argv.find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
 const value = (name) => flag(name)?.split("=").slice(1).join("=") || null;
@@ -33,6 +34,7 @@ const flags = {
   answer: devAllowed ? value("answer") : null,
   omen: devAllowed ? value("omen") : null,
   setup: !!flag("setup"),
+  escAt: devAllowed ? Number(value("esc-at")) || null : null,
   hidden: !!flag("hidden")
 };
 
