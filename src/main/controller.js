@@ -49,6 +49,11 @@ export class Controller {
       crypt: cryptFolder(appDir),
       sample: sampleFolder(appDir)
     };
+    if (flags.roots) {   // development: haunt a test folder instead of your own
+      const r = path.resolve(flags.roots);
+      this.places.roots = { Downloads: path.join(r, "Downloads"), Desktop: path.join(r, "Desktop"), Documents: path.join(r, "Documents") };
+      this.places.crypt = path.join(r, "Crypt");
+    }
   }
 
   // ---------- start-up ----------
@@ -75,7 +80,7 @@ export class Controller {
       this.capture();
     } else if (this.flags.demo) {
       this.settings.consented = true;
-      await this.begin("sample", { visitNow: !!this.flags.scene });
+      await this.begin(this.flags.demoMode, { visitNow: !!this.flags.scene });
     } else if (!this.settings.consented || this.flags.setup) {
       this.openSetup();
       if (this.flags.setup) this.capture();

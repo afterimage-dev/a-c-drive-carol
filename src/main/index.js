@@ -18,6 +18,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --omen=X         show one omen on the sample files (passing | cold | rattle | notification)
 //   --setup          open the settings window (with --capture, pictures are taken of it)
 //   --esc-at=N       press Esc N seconds into a visit (to check that nothing is applied)
+//   --demo=real      start a real-mode night at once  --roots=DIR  scan DIR\Downloads, \Desktop, \Documents instead of yours
 const argv = process.argv.slice(1);
 const flag = (name) => argv.find((a) => a === `--${name}` || a.startsWith(`--${name}=`));
 const value = (name) => flag(name)?.split("=").slice(1).join("=") || null;
@@ -26,6 +27,8 @@ const flags = {
   dev: devAllowed && !!flag("dev"),
   fast: devAllowed && !!flag("fast"),
   demo: devAllowed && !!flag("demo"),
+  demoMode: devAllowed && value("demo") === "real" ? "real" : "sample",
+  roots: devAllowed ? value("roots") : null,
   scene: devAllowed ? value("scene") : null,
   autoplay: devAllowed && !!flag("autoplay"),
   capture: devAllowed ? value("capture") : null,

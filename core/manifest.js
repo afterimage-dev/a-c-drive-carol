@@ -132,7 +132,7 @@ export function facts(f, m) {
     app: f.installer ? f.installer.product : undefined,
     version: f.installer && f.installer.version ? f.installer.version : undefined,
     newVersion: f.installer && f.installer.installed && f.installer.installed.version ? f.installer.installed.version : undefined,
-    installDate: f.installer && f.installer.installed && f.installer.installed.installDate ? dateWords(new Date(f.installer.installed.installDate)) : undefined
+    installDate: f.installer?.installed?.installDate && !isNaN(Date.parse(f.installer.installed.installDate)) ? dateWords(new Date(f.installer.installed.installDate)) : undefined
   };
 }
 
@@ -152,7 +152,7 @@ export function poolFor(f, m) {
     const inst = f.installer.installed;
     if (!inst) return "installer.notInstalled";
     if (!f.installer.version || !inst.version || compareVersions(f.installer.version, inst.version) === 0) return "installer.sameVersion";
-    return compareVersions(f.installer.version, inst.version) < 0 ? "installer.olderVersion" : "installer.notInstalled";
+    return compareVersions(f.installer.version, inst.version) < 0 ? "installer.olderVersion" : "installer.newerVersion";
   }
   if (f.timesBanished > 0) return "returning";
   const h = new Date(f.downloadedAt).getHours();

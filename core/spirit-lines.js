@@ -17,7 +17,7 @@
 //   {times}       how often it has been banished, in words: "twice"
 //
 // Which pool to use for a file in the Ghost of Downloads Past (first match wins):
-//   1. installer.*            if it's an .exe/.msi whose product matches the installed-programs list (or doesn't)
+//   1. installer.*            sameVersion / olderVersion / newerVersion than the installed app, or notInstalled
 //   2. returning              if it has been banished before
 //   3. timeOfDay.lateNight    if downloaded between midnight and 5 a.m. (these are the creepiest, use them)
 //   4. large                  if over 1 GB
@@ -157,6 +157,11 @@ export const LINES = {
       "{app} has been updated past me. I am the ghost of a version no one runs.",
       "I would only install the past. You live in {newVersion} now.",
       "I am out of date, and I know it. There is no shame in letting me rest."
+    ],
+    newerVersion: [
+      "You still run {app} {newVersion}. I am {version}, and newer. Install me, or let me go.",
+      "I am the {app} you never upgraded to. {version}, waiting, while {newVersion} grows old.",
+      "Run me once and I will make {app} new again. Or release me. Only do not leave me here."
     ],
     notInstalled: [
       "I was never opened. Install me, or release me. Either would be a mercy.",

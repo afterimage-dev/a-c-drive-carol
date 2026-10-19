@@ -97,13 +97,22 @@ function originOf(abs) {
   } catch { return null; }
 }
 
+/** InstallDate as written by the installer: usually YYYYMMDD, sometimes nonsense. Only real dates are kept. */
+export function installDateOf(raw) {
+  const m = /^(\d{4})(\d{2})(\d{2})$/.exec(String(raw || "").trim());
+  if (!m) return null;
+  const [y, mo, d] = m.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, mo - 1, d, 12));
+  return y > 1990 && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d && date.getTime() <= Date.now() ? date.toISOString() : null;
+}
+
 /** Installed programs, from the same registry list "Apps & features" reads. */
 function installedApps() {
   const ps = `$p='HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*','HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*';
     Get-ItemProperty $p -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName } | Select-Object DisplayName, DisplayVersion, InstallDate | ConvertTo-Json -Compress`;
   return asArray(powershell(ps)).map((a) => ({
     name: a.DisplayName, version: a.DisplayVersion || null,
-    installDate: /^\d{8}$/.test(a.InstallDate || "") ? `${a.InstallDate.slice(0, 4)}-${a.InstallDate.slice(4, 6)}-${a.InstallDate.slice(6, 8)}T12:00:00.000Z` : null
+    installDate: installDateOf(a.InstallDate)
   }));
 }
 

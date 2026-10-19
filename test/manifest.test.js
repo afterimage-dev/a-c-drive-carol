@@ -5,6 +5,7 @@ import path from "node:path";
 import { makeSample } from "../core/make-sample.js";
 import { pastCandidates, presentGroups, suggestOriginal, claimFor, poolFor, linesFor, forecast, humanSize, compareVersions, facts } from "../core/manifest.js";
 import { LINES, timeOfDayPool, pick } from "../core/spirit-lines.js";
+import { installDateOf } from "../core/scan.js";
 import { tempDir } from "./helpers.js";
 
 const sample = (t) => makeSample(path.join(tempDir(t, "sample"), "Sample"));
@@ -87,4 +88,18 @@ test("sizes and versions", () => {
   assert.equal(compareVersions("3.0.20", "3.0.21"), -1);
   assert.equal(compareVersions("22.11.0", "22.11"), 0);
   assert.equal(compareVersions("10.0", "9.9.9"), 1);
+});
+
+test("an installer newer than the installed app offers an upgrade; nonsense install dates are dropped", (t) => {
+  const m = sample(t);
+  const vlc = m.files.find((f) => f.name === "vlc-3.0.20-win64.exe");
+  vlc.installer.installed.version = "3.0.16";
+  assert.equal(poolFor(vlc, m), "installer.newerVersion");
+  assert.doesNotMatch(linesFor(vlc, m).lines[0], /\{\w+\}/);
+  assert.equal(installDateOf("20204508"), null);
+  assert.equal(installDateOf("20230231"), null);
+  assert.equal(installDateOf(""), null);
+  assert.match(installDateOf("20230115"), /^2023-01-15/);
+  vlc.installer.installed.installDate = "2020-45-08T12:00:00.000Z";
+  assert.equal(facts(vlc, m).installDate, undefined);
 });
