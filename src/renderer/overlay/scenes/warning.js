@@ -53,8 +53,10 @@ export async function warning(ctx) {
 
   if (answer === "here") {
     // he drags the chain off-screen
-    marl.moveTo(W + h * 1.4, y + h * 0.05, 2.2, 2.4);
-    await wait(3200, signal);
+    // until the whole chain has been dragged off the right edge
+    chain.walls = false;
+    marl.moveTo(W + h * 6, y + h * 0.05, 1.6, 2.2);
+    await Promise.race([chain.gone((e) => e.minX > W + 20), wait(1e9, signal)]);
   } else {
     stage.glitch(0.35);
     sound.whoosh(1.2, 0.07);

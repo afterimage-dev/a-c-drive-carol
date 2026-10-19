@@ -22,7 +22,7 @@ export async function bell(ctx) {
   marl.jump(W + h * 0.6, H * 0.52);
   marl.facing = 1;
   const exts = [...new Set(night.chain.biggest.map((f) => (f.ext ? "." + f.ext : ".?")))];
-  const chain = new Chain(stage, marl, { links: 40, floorY: H - 4, exts, sound });
+  const chain = new Chain(stage, marl, { links: 40, floorY: H - 4, exts, sound, walls: false });
   marl.fadeTo(1, 1.4);
   await wait(2600, signal);
 
@@ -32,8 +32,9 @@ export async function bell(ctx) {
   await tween(900, (k) => { marl.s.nod = k; }, signal);
   await wait(500, signal);
   sound.whoosh(1.6, 0.06);
-  marl.moveTo(marl.M.x - W * 0.05, -H * 0.9, 2.6, 2.2);
-  await wait(3000, signal);
+  // keep rising until the last link of the chain has cleared the top of the screen
+  marl.moveTo(marl.M.x - W * 0.05, -H * 2.6, 1.6, 1.7);
+  await Promise.race([chain.gone((e) => e.maxY < -20), wait(1e9, signal)]);
   chain.remove();
   marl.remove();
   sound.scrape(0);

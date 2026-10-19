@@ -32,12 +32,13 @@ export class Chain {
    * @param {import("./stage.js").Puppet} puppet  Marlware
    * @param {object} o  { links, floorY, exts: file extensions for the pendants, sound }
    */
-  constructor(stage, puppet, { links = 34, floorY, exts = [".exe", ".zip", ".iso", "(1)"], sound = null } = {}) {
+  constructor(stage, puppet, { links = 34, floorY, exts = [".exe", ".zip", ".iso", "(1)"], sound = null, walls = true } = {}) {
     this.stage = stage;
     this.puppet = puppet;
     this.N = links;
     this.floorY = floorY ?? stage.H;
     this.sound = sound;
+    this.walls = walls;   // the screen's sides stop the chain (off when it has to leave the screen)
     this.exts = exts.length ? exts : [".tmp"];
     this.view = new PIXI.Container();
     stage.sys.world.addChild(this.view);
@@ -184,6 +185,7 @@ export class Chain {
         if (Math.abs(vx) <= mu) PX[i] = X[i]; else PX[i] = X[i] - (vx - Math.sign(vx) * mu);
         this.slide += Math.abs(vx) / dt / S;
       }
+      if (!this.walls) continue;
       if (X[i] < r) { const vx = X[i] - PX[i]; X[i] = r; PX[i] = r + vx * 0.3; }
       else if (X[i] > W - r) { const vx = X[i] - PX[i]; X[i] = W - r; PX[i] = W - r + vx * 0.3; }
     }
@@ -242,6 +244,21 @@ export class Chain {
     this.events.length = 0;
     // a scrape only for real dragging, not for a link settling on the floor
     snd.scrape(this.slide > 6 ? Math.min(0.16, (this.slide - 6) * 0.003) : 0);
+  }
+
+  /** The chain's extent on screen, for knowing when it has gone. */
+  extent() {
+    let minX = Infinity, maxY = -Infinity;
+    for (let i = 0; i < this.count; i++) { if (this.X[i] < minX) minX = this.X[i]; if (this.Y[i] > maxY) maxY = this.Y[i]; }
+    return { minX, maxY: maxY + this.Lp };
+  }
+
+  /** Resolves once `gone(extent)` is true (checked every frame), or after `maxMs` regardless. */
+  gone(test, maxMs = 9000) {
+    return new Promise((resolve) => {
+      const start = performance.now();
+      const off = this.stage.add(() => { if (test(this.extent()) || performance.now() - start > maxMs) { off(); resolve(); } });
+    });
   }
 
   /** The nearest link or pendant to (x, y), within reach; -1 if none. */
