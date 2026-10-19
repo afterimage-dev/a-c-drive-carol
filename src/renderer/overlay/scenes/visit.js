@@ -45,5 +45,5 @@ export async function visit(ctx, { backdrop: bytes }) {
   for (const name of ORDER.slice(start)) await STAVES[name](ctx);
 
   stopCandle();
-  ctx.carol.done("morning");
+  ctx.carol.done("morning", { openCrypt: !!ctx.openCryptAfter });
 }

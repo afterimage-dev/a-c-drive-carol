@@ -50,7 +50,7 @@ addEventListener("mousemove", (e) => {
   carol.hover(over);
   if (over && !taken) {   // the cursor touched it: it rattles
     wobble = 1;
-    for (let i = 0; i < 3; i++) sound.clink(0.5 - i * 0.12, (L.x / 180) - 0.5, 0.5, i * 0.07);
+    for (let i = 0; i < 3; i++) sound.clink(0.5 - i * 0.12, (L.x / 180) - 0.5, 0.5, i * 0.09, { heavy: true });
   }
 });
 addEventListener("mouseleave", () => { if (over) { over = false; carol.hover(false); } });

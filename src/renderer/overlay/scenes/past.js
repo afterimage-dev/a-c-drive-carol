@@ -33,12 +33,12 @@ class Orbit {
       const glow = new PIXI.Sprite(glowTex); glow.anchor.set(0.5); glow.width = glow.height = 92; glow.tint = 0xffad3d; glow.alpha = 0.32; glow.blendMode = PIXI.BLEND_MODES.ADD;
       const icon = new PIXI.Sprite(iconTexture(ctx, f)); icon.anchor.set(0.5); icon.width = icon.height = 48;
       const label = new PIXI.Text(f.name, new PIXI.TextStyle({ fontFamily: "JetBrains Mono", fontSize: 12, fill: "#fff1d6", dropShadow: true, dropShadowColor: "#000", dropShadowBlur: 4, dropShadowDistance: 0 }));
-      label.anchor.set(0.5, 0); label.y = 32; label.resolution = 2; label.alpha = 0;
+      label.anchor.set(0.5, 0); label.y = 30; label.resolution = 3; label.alpha = 0;
       holder.addChild(glow, icon, label);
       holder.eventMode = "static"; holder.cursor = "pointer";
       holder.hitArea = new PIXI.Circle(0, 0, 34);
       const item = { f, holder, glow, icon, label, rank: n - 1 - i, angle: (i / n) * Math.PI * 2, hover: false, state: "orbit", t: 0, alpha: 0 };
-      holder.on("pointerover", () => { item.hover = true; });
+      holder.on("pointerover", () => { item.hover = true; ctx.sound.clink(0.12, 0, 0.2); });
       holder.on("pointerout", () => { item.hover = false; });
       holder.on("pointertap", (e) => { e.stopPropagation(); if (item.state === "orbit" && this.onTap) this.onTap(item); });
       stage.layers.iconsBack.addChild(holder);
@@ -56,22 +56,27 @@ class Orbit {
     const c = this.spirit.centre();
     const n = Math.max(1, this.items.length);
     const scale = stage.H / 1080;
+    // the whole orbit stops while you point at a file, so it holds still to be read
+    const held = this.items.some((i) => i.hover && i.state === "orbit");
+    this.spin = (this.spin ?? 1) + ((held ? 0 : 1) - (this.spin ?? 1)) * Math.min(1, dt * 6);
     for (const it of this.items) {
       it.t += dt;
       const rx = (250 + 190 * (it.rank / Math.max(1, n - 1))) * scale * 1.15, ry = rx * 0.32;
       if (it.state === "orbit" || it.state === "chosen") {
-        it.angle += dt * (0.22 - 0.1 * (it.rank / n)) * (it.state === "chosen" ? 0.15 : 1) * (this.slow ? 0.3 : 1);
+        it.angle += dt * (0.075 - 0.03 * (it.rank / n)) * (it.state === "chosen" ? 0.15 : 1) * (this.slow ? 0.3 : 1) * this.spin;
         it.alpha = Math.min(1, it.alpha + dt * 0.8);
         const x = c.x + Math.cos(it.angle) * rx, y = c.y - 20 * scale + Math.sin(it.angle) * ry;
         const front = Math.sin(it.angle) > 0;
-        const want = front ? stage.layers.iconsFront : stage.layers.iconsBack;
+        const want = front || it.hover || it.state === "chosen" ? stage.layers.iconsFront : stage.layers.iconsBack;
         if (it.holder.parent !== want) want.addChild(it.holder);
         it.holder.position.set(x, y);
         const depth = 0.78 + 0.22 * (Math.sin(it.angle) + 1) / 2;
         const pulse = it.pulse ? 1 + 0.18 * Math.abs(Math.sin(t * 4)) : 1;
-        const big = it.state === "chosen" ? 1.45 : it.hover ? 1.2 : 1;
-        it.holder.scale.set(depth * pulse * big);
-        it.holder.alpha = it.alpha * (front ? 0.95 : 0.6);
+        const big = it.state === "chosen" ? 1.6 : it.hover ? 2 : 1;
+        it.grow = (it.grow ?? 1) + (big - (it.grow ?? 1)) * Math.min(1, dt * 10);
+        it.holder.scale.set((it.hover || it.state === "chosen" ? 1 : depth) * pulse * it.grow);
+        it.holder.alpha = it.alpha * (front || it.hover ? 0.97 : 0.6);
+        if (it.hover) it.holder.parent?.setChildIndex(it.holder, it.holder.parent.children.length - 1);
         it.label.alpha += ((it.hover || it.state === "chosen" ? 1 : 0) - it.label.alpha) * Math.min(1, dt * 8);
         it.glow.alpha = 0.3 + (it.state === "chosen" ? 0.4 : 0) + 0.06 * Math.sin(t * 2 + it.rank);
       } else if (it.state === "rest") {   // sinks and dissolves, as if into the ground

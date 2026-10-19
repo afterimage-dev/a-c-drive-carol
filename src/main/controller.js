@@ -16,7 +16,7 @@ import { prepareNight, omenFiles, omenWord } from "./night.js";
 import { applyMemory, remember, returningFiles } from "./memory.js";
 import { DownloadWatcher } from "./watcher.js";
 import { describe, placeOf } from "../../core/scan.js";
-import { iconsFor } from "./icons.js";
+import { iconsFor, thumbnailsFor } from "./icons.js";
 import { captureDesktop } from "./capture.js";
 import { initialState, restore, step, needsPolling } from "./scheduler.js";
 import { checkSafe, notificationState } from "./safe-moment.js";
@@ -196,7 +196,8 @@ export class Controller {
       drive: this.lastDrive || { total: 0, free: 0, growthPerMonth: 1, simulated: false },
       files: files.map((f) => ({ ...f, group: kind === "twin" ? "g1" : null })),
       groups: kind === "twin" ? [{ id: "g1", hash: "", members: files.map((f) => f.id) }] : [] };
-    this.mini = { kind, manifest: m, night: prepareNight(m), icons: await iconsFor(m.files) };
+    const [icons, thumbs] = await Promise.all([iconsFor(m.files), thumbnailsFor(m.files)]);
+    this.mini = { kind, manifest: m, night: prepareNight(m), icons, thumbs };
     this.link.hide();
     this.scene = "apparition";
     await this.overlay.passive();
@@ -215,7 +216,7 @@ export class Controller {
     await delay(250);
     const backdrop = this.flags.noBackdrop ? null : await captureDesktop();
     await this.overlay.visit();
-    this.overlay.send("scene", { name: "mini", kind: mini.kind, night: mini.night, icons: mini.icons, backdrop: backdrop ? new Uint8Array(backdrop) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+    this.overlay.send("scene", { name: "mini", kind: mini.kind, night: mini.night, icons: mini.icons, thumbs: mini.thumbs, backdrop: backdrop ? new Uint8Array(backdrop) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
   }
 
   endMini() {
@@ -245,7 +246,7 @@ export class Controller {
       this.link.hide();
       await this.overlay.passive();
       this.scene = "warning";
-      this.overlay.send("scene", { name: "warning", night: this.night, icons: this.icons, refusals: this.sched.refusals, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+      this.overlay.send("scene", { name: "warning", night: this.night, icons: this.icons, thumbs: this.thumbs, refusals: this.sched.refusals, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
       this.capture();
     } catch (err) {
       console.error(err);
@@ -276,7 +277,8 @@ export class Controller {
     const shown = new Map();
     for (const f of [...this.night.past, ...this.night.chain.biggest, ...this.night.present.groups.flatMap((g) => g.files)]) shown.set(f.id, f);
     const byId = new Map(this.manifest.files.map((f) => [f.id, f]));
-    this.icons = await iconsFor([...shown.keys()].map((id) => byId.get(id)).filter(Boolean));
+    const files = [...shown.keys()].map((id) => byId.get(id)).filter(Boolean);
+    [this.icons, this.thumbs] = await Promise.all([iconsFor(files), thumbnailsFor(files)]);
     this.save();
   }
 
@@ -293,7 +295,7 @@ export class Controller {
     const backdrop = this.flags.noBackdrop ? null : await captureDesktop();
     await this.overlay.visit();
     if (this.flags.escAt) setTimeout(() => { console.log("Pressing Esc"); this.onEsc(); console.log("Scheduler after Esc:", JSON.stringify({ phase: this.sched.phase, fled: this.sched.fled })); }, this.flags.escAt * 1000);
-    this.overlay.send("scene", { name: "visit", night: this.night, icons: this.icons, backdrop: backdrop ? new Uint8Array(backdrop) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+    this.overlay.send("scene", { name: "visit", night: this.night, icons: this.icons, thumbs: this.thumbs, backdrop: backdrop ? new Uint8Array(backdrop) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
     this.capture();
   }
 
@@ -384,11 +386,15 @@ export class Controller {
       } else if (what === "apparition") {
         if (data?.summon) this.startMini(); else { this.scene = null; this.mini = null; this.overlay.hide(); }
       } else if (what === "mini") {
+        const crypt = this.manifest?.crypt;
         this.endMini();
+        if (data?.openCrypt) setTimeout(() => this.openCrypt(crypt), 300);
         setTimeout(() => this.checkLink(), 1500);
       } else if (what === "morning") {
+        const crypt = this.manifest?.crypt;
         this.scene = null;
         this.overlay.hide();
+        if (data?.openCrypt) setTimeout(() => this.openCrypt(crypt), 300);   // once the overlay is gone, so it shows
         this.night = null;
         this.dispatch({ type: "visitEnded", completed: true });
         setTimeout(() => this.checkLink(), 1500);   // something left behind

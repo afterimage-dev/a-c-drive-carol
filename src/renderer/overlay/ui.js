@@ -8,6 +8,9 @@ export { humanSize };
 const sim = (f, field) => (f.simulated || []).includes(field);
 export const sizeText = (f) => `${humanSize(f.size)}${sim(f, "size") ? ' <span class="sim">(simulated)</span>' : ""}`;
 
+/** A preview of what the file really is (pictures, videos, PDFs), when Windows could make one. */
+export const previewHtml = (ctx, f) => (ctx.thumbs?.[f.id] ? `<img class="preview" src="${ctx.thumbs[f.id]}" alt="Preview of ${esc(f.name)}">` : "");
+
 export function iconHtml(ctx, f) {
   const src = ctx.icons[f.id];
   return src ? `<img src="${src}" alt="">` : `<span class="noicon">${esc((f.ext || "file").slice(0, 4))}</span>`;
@@ -75,11 +78,12 @@ export async function fileCard(ctx, f, { auto = null } = {}) {
     f.site ? `from ${esc(f.site)}` : "origin unknown", esc(f.folder)].join(" · ");
   const card = el("div", "file interactive", `
     <header>${iconHtml(ctx, f)}<div><div class="name">${esc(f.name)}</div><div class="meta">${meta}</div></div></header>
+    ${previewHtml(ctx, f)}
     ${f.installer ? `<div class="note">${esc(f.installer)}${sim(f, "installer") ? " (simulated)" : ""}</div>` : ""}
     <div class="says"></div>
     <div class="choices"></div>`);
   card.style.left = `calc(50% - min(280px, 45vw))`;
-  card.style.top = `${Math.round((ctx.floorY ?? ctx.stage.H) - 250)}px`;
+  card.style.bottom = `${Math.round(ctx.stage.H - (ctx.floorY ?? ctx.stage.H) + 30)}px`;   // grows upwards, whatever it holds
   ctx.ui.appendChild(card);
   requestAnimationFrame(() => card.classList.add("on"));
   try {
@@ -105,14 +109,15 @@ export async function fileCard(ctx, f, { auto = null } = {}) {
  * The Present's row of identical copies, each arguing its claim. `choice()` resolves with a file id ("this one is
  * real") or "all" ("keep them all"); `fall(id)` sends every other copy tumbling.
  */
-export function presentRow(ctx, group, { top }) {
+export function presentRow(ctx, group) {
   const row = el("div", "row interactive");
-  row.style.top = `${Math.round(top)}px`;
+  row.style.bottom = `${Math.round(ctx.stage.H - (ctx.floorY ?? ctx.stage.H) + 74)}px`;   // just above the dock, growing upwards
   const shown = group.files.slice(0, 4);
   const extra = group.files.length - shown.length;
   const cards = shown.map((f) => {
     const c = el("div", `copy${f.id === group.original ? " suggested" : ""}`, `
       <header>${iconHtml(ctx, f)}<div><div class="name">${esc(f.name)}</div><div class="meta">${esc(f.folder)} · ${esc(f.date)}${sim(f, "downloadedAt") ? " (simulated)" : ""}</div></div></header>
+      ${previewHtml(ctx, f)}
       <div class="claim"></div>
       ${f.cloudSynced ? '<div class="stays">Lives in OneDrive, so it stays where it is.</div>' : ""}
       <button type="button" data-key="${esc(f.id)}"${f.id === group.original ? ' class="primary"' : ""}>This one is real</button>`);

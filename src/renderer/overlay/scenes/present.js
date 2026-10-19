@@ -41,7 +41,6 @@ export async function present(ctx) {
     const updateTally = () => { tally.textContent = `${impostors} ${impostors === 1 ? "impostor" : "impostors"} · ${humanSize(impostorBytes)}${night.simulatedSizes ? " (simulated)" : ""}`; tally.classList.toggle("on", impostors > 0); };
     const bar = dock(ctx, "Which one is real?", [["enough", "Enough, spirit"]], { accent: "#9dff9f" });
     const enough = bar.choice().then(() => "enough");
-    const rowTop = Math.min(H * 0.62, (ctx.floorY ?? H) - 300);
 
     for (let gi = 0; gi < groups.length; gi++) {
       const g = groups[gi];
@@ -49,7 +48,7 @@ export async function present(ctx) {
       sp.s.twin = 1;
       sp.s.begone = false;
       stage.glitch(0.2, 0.5);
-      const row = presentRow(ctx, g, { top: rowTop });
+      const row = presentRow(ctx, g);
       sp.s.laugh = 0.6;
       await row.argue();
       if (gi === 0) {

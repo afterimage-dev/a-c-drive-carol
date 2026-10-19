@@ -2,7 +2,7 @@
 // and clicks go straight through to your desktop everywhere except on him, his chain and his card.
 
 import { Chain } from "../chain.js";
-import { wait } from "../util.js";
+import { wait, el, clamp } from "../util.js";
 
 /** Dark towards the far corners, clear around (fx, fy): a light pool round his corner, the rest in shadow. */
 function cornerVignette(W, H, fx, fy) {
@@ -49,9 +49,24 @@ export async function warning(ctx) {
   ctx.onPointerUp(() => chain.drop());
 
   marl.fadeTo(1, 1.4);
-  sound.clink(0.5, 0.7);
+  sound.clink(0.6, 0.7, 0.6, 0, { heavy: true });
   sound.music("marl", { level: 0.55 });   // quieter: your desktop isn't dimmed for a warning
-  await wait(1500, signal);
+  await wait(1200, signal);
+
+  // the stave's title, small, in his corner: where his first line will appear, gone before it does
+  const title = el("div", "corner-title", `<span class="stave">Stave One</span><span class="name">Marlware's Ghost</span>`);
+  ctx.ui.appendChild(title);
+  const top = marl.headTop();
+  title.style.left = `${Math.round(clamp(top.x - title.offsetWidth / 2, 12, W - title.offsetWidth - 12))}px`;
+  title.style.top = `${Math.round(top.y - title.offsetHeight - 14)}px`;
+  requestAnimationFrame(() => title.classList.add("on"));
+  try {
+    await wait(2800, signal);
+    title.classList.remove("on");
+    await wait(700, signal);
+  } finally {
+    title.remove();
+  }
   if (ctx.settings.fling) {   // development: whirl a link round his hand, then let go
     const ptr = stage.ptr, hand = chain.hand();
     chain.take(12);

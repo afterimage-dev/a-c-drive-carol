@@ -42,7 +42,7 @@ export async function morning(ctx) {
     panel.el.addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
-      if (b.dataset.act === "crypt") carol.openCrypt();
+      if (b.dataset.act === "crypt") { ctx.openCryptAfter = true; resolve(); }   // close first, or Explorer opens behind us
       if (b.dataset.act === "close") resolve();
     });
     if (ctx.settings.autoplay) setTimeout(resolve, 4000);

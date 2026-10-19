@@ -43,6 +43,13 @@ export class Sound {
     this.verb = ac.createConvolver(); this.verb.buffer = imp;
     this.verbIn = ac.createGain(); this.verbIn.gain.value = 0.5;
     this.verbIn.connect(this.verb); this.verb.connect(this.master);
+    // an echo for the chain: a dark, repeating tail that gives it depth and weight
+    this.echoIn = ac.createGain(); this.echoIn.gain.value = 1;
+    const delay = ac.createDelay(1); delay.delayTime.value = 0.19;
+    const fb = ac.createGain(); fb.gain.value = 0.42;
+    const dark = ac.createBiquadFilter(); dark.type = "lowpass"; dark.frequency.value = 1400;
+    const wet = ac.createGain(); wet.gain.value = 0.5;
+    this.echoIn.connect(delay); delay.connect(dark); dark.connect(fb); fb.connect(delay); dark.connect(wet); wet.connect(this.master); wet.connect(this.verbIn);
     const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), nd = nb.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this.noise = nb;
@@ -96,16 +103,26 @@ export class Sound {
     n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + 0.05);
   }
 
-  /** A single chain clink: four inharmonic partials and a tick. */
-  clink(strength = 0.6, pan = 0, send = 0.45, when = 0) {
+  /**
+   * A single clink: four inharmonic partials and a tick. Heavy (Marlware's chain) is an octave lower, rings longer,
+   * has a dull iron thud beneath it, and echoes; light (buttons) is small and bright.
+   */
+  clink(strength = 0.6, pan = 0, send = 0.45, when = 0, { heavy = false } = {}) {
     if (!this.enabled) return;
-    const ac = this.ensure(), t = ac.currentTime + when, out = this.out(0.04 + 0.32 * Math.pow(strength, 1.2), pan, send);
-    const f = rnd(1100, 2600);
+    const ac = this.ensure(), t = ac.currentTime + when, out = this.out((heavy ? 0.06 : 0.04) + (heavy ? 0.4 : 0.32) * Math.pow(strength, 1.2), pan, heavy ? 0.7 : send);
+    if (heavy) { const e = ac.createGain(); e.gain.value = 0.55; out.connect(e); e.connect(this.echoIn); }
+    const f = heavy ? rnd(420, 900) : rnd(1100, 2600), ring = heavy ? 2.2 : 1;
     for (const [m, a, d] of [[1, 1, 0.16], [2.76, 0.55, 0.11], [5.4, 0.32, 0.07], [8.93, 0.18, 0.045]]) {
       const o = ac.createOscillator(), g = ac.createGain();
       o.frequency.value = f * m * rnd(0.995, 1.005);
-      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d * (0.7 + strength * 0.6));
-      o.connect(g); g.connect(out); o.start(t); o.stop(t + d + 0.1);
+      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d * ring * (0.7 + strength * 0.6));
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + d * ring * 1.3 + 0.1);
+    }
+    if (heavy) {   // the weight of it: a short, low knock under the ring
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.setValueAtTime(rnd(120, 170), t); o.frequency.exponentialRampToValueAtTime(rnd(60, 80), t + 0.16);
+      g.gain.setValueAtTime(0.9 * (0.5 + strength * 0.5), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.25);
     }
     const n = this.noiseSource(), bp = this.band(3500, 7000), g = ac.createGain();
     g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
@@ -115,7 +132,7 @@ export class Sound {
   /** A chain rattling: near, or far off in another room. */
   rattle({ count = 7, spread = 1.1, strength = 0.6, pan = 0.4, far = false } = {}) {
     if (!this.enabled) return;
-    for (let k = 0; k < count; k++) this.clink(strength * rnd(0.5, 1) * (far ? 0.35 : 1), pan + rnd(-0.15, 0.15), far ? 0.9 : 0.45, Math.random() * spread);
+    for (let k = 0; k < count; k++) this.clink(strength * rnd(0.5, 1) * (far ? 0.35 : 1), pan + rnd(-0.15, 0.15), far ? 0.9 : 0.45, Math.random() * spread, { heavy: true });
   }
 
   /** A chain dragging along the floor; `level` 0..1, call every frame or on change. */
@@ -123,7 +140,7 @@ export class Sound {
     if (!this.enabled && !this.loops.scrape) return;
     this.ensure();
     if (!this.loops.scrape) {
-      const src = this.noiseSource(true), bp = this.band(1200, 2400), g = this.ac.createGain(); g.gain.value = 0;
+      const src = this.noiseSource(true), bp = this.band(500, 1300), g = this.ac.createGain(); g.gain.value = 0;   // a low, heavy drag
       src.connect(bp); bp.connect(g); g.connect(this.out(1, 0.3, 0.4)); src.start();
       this.loops.scrape = g;
     }

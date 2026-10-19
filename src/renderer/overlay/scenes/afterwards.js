@@ -73,7 +73,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
     await wait(900, signal);
     const say = (text, o = {}) => talk.say(text, { voice: "present", puppet: sp, signal, ...o });
     await say("Another brother! Come, come.");
-    const row = presentRow(ctx, g, { top: Math.min(stage.H * 0.62, ctx.floorY - 300) });
+    const row = presentRow(ctx, g);
     await row.argue();
     if (ctx.settings.autoplay) setTimeout(() => row.choose(g.original), 1500);
     const picked = await Promise.race([row.choice(), until(() => {}, signal)]);
@@ -122,13 +122,13 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
   await until((resolve) => {
     panel.el.addEventListener("click", (e) => {
       const b = e.target.closest("button");
-      if (b?.dataset.act === "crypt") ctx.carol.openCrypt();
+      if (b?.dataset.act === "crypt") { ctx.openCryptAfter = true; resolve(); }
       if (b?.dataset.act === "close") resolve();
     });
     if (ctx.settings.autoplay) setTimeout(resolve, 3000);
   }, signal);
   stopCandle();
-  ctx.carol.done("mini");
+  ctx.carol.done("mini", { openCrypt: !!ctx.openCryptAfter });
 }
 
 export { humanSize };

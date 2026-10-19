@@ -54,7 +54,7 @@ function makeCtx(kind, payload, signal) {
   const pointerDown = [], pointerUp = [];
   return {
     kind, carol, stage, sound, talk, ui, signal, settings,
-    night: payload.night, icons: payload.icons || {}, refusals: payload.refusals || 0,
+    night: payload.night, icons: payload.icons || {}, thumbs: payload.thumbs || {}, refusals: payload.refusals || 0,
     floorY: stage.floorY,
     softTexture,
     hitTests: [],

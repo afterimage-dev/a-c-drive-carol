@@ -243,7 +243,7 @@ export class Chain {
       const s = Math.min(1, (ev.s - 0.8) / 3.5); if (s <= 0) break;
       if (this.moved(ev.i) < minTravel) continue;   // it hasn't really moved since it last clinked
       if (now - (this.lastClink || 0) < 45) break;
-      snd.clink(s * 0.75, (ev.x / this.stage.W) * 2 - 1);
+      snd.clink(s * 0.75, (ev.x / this.stage.W) * 2 - 1, 0.6, 0, { heavy: true });
       this.heardX[ev.i] = this.X[ev.i]; this.heardY[ev.i] = this.Y[ev.i];
       this.lastClink = now; this.clinkBudget -= 1; played++;
     }

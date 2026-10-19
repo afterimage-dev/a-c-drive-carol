@@ -68,14 +68,14 @@ const isCopyName = (name) => /\(\d+\)|^copy of |\s-\scopy\b/i.test(name);
 // ---------- Choosing who haunts ----------
 
 /** Old, forgotten files for the Ghost of Downloads Past. Duplicates are left for the Present. Oldest first. */
-export function pastCandidates(m, { minAgeDays = 30, limit = 16 } = {}) {
+export function pastCandidates(m, { minAgeDays = 30, limit = 12 } = {}) {
   const oldestFirst = (a, b) => Date.parse(a.downloadedAt) - Date.parse(b.downloadedAt);
   const pool = m.files
     .filter((f) => !f.group && !f.cloudSynced)
     .filter((f) => daysSince(f.downloadedAt) >= minAgeDays)
     .filter((f) => /^(Downloads|Desktop)/.test(f.folder) || f.timesBanished > 0);
-  // installers always get their say; the oldest of everything else fills the rest
-  const installers = pool.filter((f) => f.installer).sort(oldestFirst);
+  // installers get their say (up to half the places, oldest first); the oldest of everything else fills the rest
+  const installers = pool.filter((f) => f.installer).sort(oldestFirst).slice(0, Math.ceil(limit / 2));
   const rest = pool.filter((f) => !f.installer).sort(oldestFirst).slice(0, Math.max(0, limit - installers.length));
   return [...installers, ...rest].sort(oldestFirst);
 }
