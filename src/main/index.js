@@ -21,6 +21,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --wisp=PATH      pretend PATH (in --roots) was banished 30 days ago, so its wisp returns
 //   --profile=DIR    keep settings in DIR instead of the real profile (for test runs)
 //   --fling          in the warning, whirl the chain round his hand and let go (to check it always falls)
+//   --music[=past]   play each spirit's theme in turn, or from the one named (Next / Stop in the corner)
 //   --esc-at=N       press Esc N seconds into a visit (to check that nothing is applied)
 //   --demo=real      start a real-mode night at once  --roots=DIR  scan DIR\Downloads, \Desktop, \Documents instead of yours
 const argv = process.argv.slice(1);
@@ -43,6 +44,7 @@ const flags = {
   setup: !!flag("setup"),
   link: devAllowed && !!flag("link"),
   fling: devAllowed && !!flag("fling"),
+  music: devAllowed && flag("music") ? (value("music") || true) : false,
   wisp: devAllowed ? value("wisp") : null,
   escAt: devAllowed ? Number(value("esc-at")) || null : null,
   hidden: !!flag("hidden")

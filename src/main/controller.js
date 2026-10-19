@@ -89,7 +89,11 @@ export class Controller {
     this.checkLink();
     this.watchDownloads();
 
-    if (this.flags.omen) {
+    if (this.flags.music) {
+      this.scene = "omen";
+      await this.overlay.passive();
+      this.overlay.send("scene", { name: "music", theme: typeof this.flags.music === "string" ? this.flags.music : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+    } else if (this.flags.omen) {
       await this.prepare("sample");
       this.omen(this.flags.omen);
       this.capture();

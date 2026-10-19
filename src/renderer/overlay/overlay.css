@@ -83,6 +83,14 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
 .corner-title .stave { font-family: var(--mono); font-size: 11px; letter-spacing: .32em; text-transform: uppercase; color: var(--dim); }
 .corner-title .name { font-family: var(--display); font-size: 30px; line-height: 1.05; color: #f2effa; text-shadow: 0 0 18px rgba(0, 0, 0, .8); white-space: nowrap; }
 
+/* development: the music preview */
+.music-panel { position: absolute; right: 24px; bottom: 80px; display: grid; gap: 4px; padding: 14px 18px; border-radius: 12px; max-width: 360px;
+  background: rgba(8, 7, 14, .9); border: 1px solid var(--rule); box-shadow: 0 10px 40px rgba(0, 0, 0, .45); opacity: 0; transition: opacity .5s; }
+.music-panel.on { opacity: 1; }
+.music-panel .stave { font-family: var(--mono); font-size: 10.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--dim); }
+.music-panel strong { font-family: var(--display); font-weight: 400; font-size: 22px; }
+.music-panel .how { color: var(--dim); font-size: 13.5px; }
+
 /* ---------- corners ---------- */
 .esc-hint { position: absolute; right: 18px; bottom: 14px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: rgba(233, 230, 245, .55); }
 .sample-tag { position: absolute; left: 18px; top: 14px; font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #ffd9a0;

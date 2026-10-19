@@ -8,6 +8,7 @@ import { warning } from "./scenes/warning.js";
 import { visit } from "./scenes/visit.js";
 import { omen } from "./scenes/omens.js";
 import { apparition, mini } from "./scenes/afterwards.js";
+import { music } from "./scenes/music.js";
 import { Aborted } from "./util.js";
 
 const carol = window.carol;
@@ -98,6 +99,7 @@ carol.on("scene", (p) => {
   else if (p.name === "visit") play("visit", visit, p);
   else if (p.name === "apparition") play("apparition", apparition, p);
   else if (p.name === "mini") play("visit", mini, p);
+  else if (p.name === "music") play("music", music, p);
 });
 carol.on("omen", (p) => { if (!run) play("omen", omen, p); });
 carol.on("esc", () => { if (run) { run.ac.abort(); run = null; reset(); } });

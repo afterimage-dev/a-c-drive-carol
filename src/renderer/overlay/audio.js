@@ -10,8 +10,9 @@ const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
 const THEMES = {
   // Jacob Marlware: cold and low, a minor drone that shifts without resolving
   marl: { chords: [[38, 45, 50, 53], [38, 45, 48, 52], [36, 43, 50, 51], [38, 45, 50, 53]], dur: 11, wave: "sine", wave2: "triangle", cutoff: 900, gain: 0.5, attack: 4, glass: 74 },
-  // the Ghost of Downloads Past: warm and wistful, open chords that drift like a half-remembered afternoon
-  past: { chords: [[53, 57, 60, 64], [48, 55, 62, 64], [45, 52, 55, 60], [43, 50, 57, 60]], dur: 9, wave: "triangle", wave2: "sine", cutoff: 1500, gain: 0.42, attack: 3, vibrato: 4.2, glass: 76 },
+  // the Ghost of Downloads Past: melancholy and wistful, minor chords with a bittersweet added note, drifting slowly
+  // like a half-remembered afternoon (A minor add 9, F major 7, D minor 9, E minor 7)
+  past: { chords: [[45, 52, 59, 60], [41, 48, 57, 64], [38, 50, 53, 57, 64], [40, 47, 55, 59, 62]], dur: 11, wave: "triangle", wave2: "sine", cutoff: 1150, gain: 0.44, attack: 4.5, vibrato: 3.6, glass: 71 },
   // the Ghost of Filesystems Present: jovial, bright major chords on a reedy organ, swaying like a full table
   present: { chords: [[43, 50, 55, 59, 62], [48, 55, 60, 64], [43, 50, 59, 62, 67], [50, 57, 62, 66]], dur: 4.6, wave: "sawtooth", wave2: "triangle", cutoff: 1700, gain: 0.3, attack: 1.2, sway: { rate: 1.35, depth: 0.32 } }
 };
