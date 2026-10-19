@@ -4,6 +4,17 @@
 import { Chain } from "../chain.js";
 import { wait } from "../util.js";
 
+/** Dark towards the far corners, clear around (fx, fy): a light pool round his corner, the rest in shadow. */
+function cornerVignette(W, H, fx, fy) {
+  const c = document.createElement("canvas"); c.width = 480; c.height = Math.round(480 * H / W);
+  const g = c.getContext("2d"), cx = fx * c.width, cy = fy * c.height, r = Math.hypot(c.width, c.height);
+  const gr = g.createRadialGradient(cx, cy, r * 0.1, cx, cy, r * 0.9);
+  gr.addColorStop(0, "rgba(0,0,0,0)"); gr.addColorStop(0.12, "rgba(0,0,0,0.25)"); gr.addColorStop(0.32, "rgba(0,0,0,0.7)");
+  gr.addColorStop(0.55, "rgba(0,0,0,0.84)"); gr.addColorStop(1, "rgba(0,0,0,0.9)");
+  g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+  return PIXI.Texture.from(c);
+}
+
 export async function warning(ctx) {
   const { stage, talk, night, sound, signal } = ctx;
   const { W, H } = stage;
@@ -14,8 +25,14 @@ export async function warning(ctx) {
   stage.sys.fog = 0;   // no fog over your whole desktop for a warning
   const x = W - h * 0.55 - 36, y = floor - h * 0.62;
 
-  const marl = stage.summon("marl", { home: [x / W, y / H], height: h / H, wander: [0.012, 0.006], flip: false, alpha: 0 });
+  const marl = stage.summon("marl", { home: [x / W, y / H], height: h / H, wander: [0.012, 0.006], flip: false, alpha: 0, pace: 0.45, k: 1.6, d: 2.4 });
   marl.jump(x, y);
+
+  // the rest of the screen darkens towards its other three corners; his corner stays as it was
+  const vignette = new PIXI.Sprite(cornerVignette(W, H, x / W, y / H));
+  vignette.width = W; vignette.height = H; vignette.alpha = 0;
+  stage.layers.dim.addChild(vignette);
+  const vignetteOff = stage.add(() => { vignette.alpha = marl.s.alpha; });
 
   // a soft shadow behind him, so the phosphor reads even over a bright window
   const shade = new PIXI.Sprite(ctx.softTexture());
@@ -51,8 +68,8 @@ export async function warning(ctx) {
   for (let i = 0; i < lines.length - 1; i++) {
     await talk.say(lines[i], { voice: "marl", puppet: marl, signal });
     if (/chain you bear/.test(lines[i])) {   // the chain uncoils a little
-      marl.moveTo(x - h * 0.8, y - h * 0.05, 3, 2.6);
-      await wait(1400, signal);
+      marl.moveTo(x - h * 0.8, y - h * 0.05, 1.3, 2.2);
+      await wait(2200, signal);
       marl.roam();
     }
   }
@@ -67,7 +84,7 @@ export async function warning(ctx) {
     // he drags the chain off-screen
     // until the whole chain has been dragged off the right edge
     chain.walls = false;
-    marl.moveTo(W + h * 6, y + h * 0.05, 1.6, 2.2);
+    marl.moveTo(W + h * 6, y + h * 0.05, 1.2, 2.2);
     await Promise.race([chain.gone((e) => e.minX > W + 20), wait(1e9, signal)]);
   } else {
     stage.glitch(0.35);
@@ -76,6 +93,7 @@ export async function warning(ctx) {
     await wait(1300, signal);
   }
   shadeOff();
+  vignetteOff();
   chain.remove();
   sound.music(null);
   ctx.carol.done("warning");

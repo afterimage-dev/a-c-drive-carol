@@ -24,7 +24,7 @@ async function loadTextures() {
 
 /** A spirit on the stage: springs towards where it's sent (or wanders near home), bobs, leans, glitches round. */
 export class Puppet {
-  constructor(stage, key, { home = [0.5, 0.58], height = 0.56, wander = [0.1, 0.04], flip = false, facing = 1, alpha = 0 } = {}) {
+  constructor(stage, key, { home = [0.5, 0.58], height = 0.56, wander = [0.1, 0.04], flip = false, facing = 1, alpha = 0, pace = 1, k = 5, d = 3 } = {}) {
     this.stage = stage;
     this.key = key;
     this.sp = stage.sys.spirit(key);
@@ -36,7 +36,9 @@ export class Puppet {
     this.sp.s.facing = facing;
     this.sp.s.alpha = alpha;
     this.target = null;            // [x, y] in pixels, or null to wander near home
-    this.k = 5; this.d = 3;        // spring
+    this.pace = pace;              // how quickly it wanders (Marlware is weighed down by his chain)
+    this.k0 = k; this.d0 = d;      // its natural spring: soft and slow means heavy
+    this.k = k; this.d = d;
     this.extraY = 0;
     this.M = { x: stage.W * home[0], y: stage.H * home[1], vx: 0, vy: 0, lean: 0 };
     this.fade = null;
@@ -49,7 +51,7 @@ export class Puppet {
   get s() { return this.sp.s; }
 
   moveTo(x, y, k = 5, d = 3) { this.target = [x, y]; this.k = k; this.d = d; }
-  roam() { this.target = null; this.k = 5; this.d = 3; }
+  roam() { this.target = null; this.k = this.k0; this.d = this.d0; }
   /** Put the spirit somewhere at once (and really there, so anything attached to it, like the chain, starts right). */
   jump(x, y) { this.M.x = x; this.M.y = y; this.M.vx = this.M.vy = 0; this.sp.place(x, y, this.h, this.s.facing); }
 
@@ -66,14 +68,14 @@ export class Puppet {
     let tx, ty;
     if (this.target) [tx, ty] = this.target;
     else {
-      const s = (t + this.t0) * 0.9;
+      const s = (t + this.t0) * 0.9 * this.pace;
       tx = W * (this.home[0] + (reduced ? 0 : this.wander[0] * (Math.sin(s * 0.16) + 0.5 * Math.sin(s * 0.37 + 1.2)) / 1.5));
       ty = H * (this.home[1] + (reduced ? 0 : this.wander[1] * Math.sin(s * 0.27)));
     }
     M.vx += (this.k * (tx - M.x) - this.d * M.vx) * dt;
     M.vy += (this.k * (ty - M.y) - this.d * M.vy) * dt;
     M.x += M.vx * dt; M.y += M.vy * dt;
-    const bob = reduced ? 0 : Math.sin(t * 1.2 * this.c.m.speed) * 6 * (this.key === "yet" ? 0.3 : 1) * (this.h / 600) + S.laugh * 5 * Math.abs(Math.sin(t * 9));
+    const bob = reduced ? 0 : Math.sin(t * 1.2 * this.c.m.speed * Math.min(1, 0.4 + this.pace)) * 6 * (this.key === "yet" ? 0.3 : 1) * (this.h / 600) + S.laugh * 5 * Math.abs(Math.sin(t * 9));
     if (this.flip && !reduced) {
       const want = M.vx > 30 ? -1 : M.vx < -30 ? 1 : S.facing;
       if (want !== S.facing && !this.turning) {

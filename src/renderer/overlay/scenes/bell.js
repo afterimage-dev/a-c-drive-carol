@@ -19,14 +19,14 @@ export async function bell(ctx) {
   stage.ramp = "marl";
   const h = H * 0.56;
   stage.setCellFor(h);
-  const marl = stage.summon("marl", { home: [0.6, 0.5], height: 0.56, wander: [0.08, 0.03], flip: true, alpha: 0 });
+  const marl = stage.summon("marl", { home: [0.6, 0.5], height: 0.56, wander: [0.05, 0.02], flip: true, alpha: 0, pace: 0.45, k: 1.6, d: 2.4 });
   marl.jump(W + h * 0.6, H * 0.52);
   const exts = [...new Set(night.chain.biggest.map((f) => (f.ext ? "." + f.ext : ".?")))];
   const chain = new Chain(stage, marl, { links: 40, floorY: H - 4, exts, sound, walls: false, trail: 1 });
   // he drifts in slowly, dragging the chain behind him, then lets it settle
-  marl.moveTo(W * 0.6, H * 0.52, 1.1, 1.9);
+  marl.moveTo(W * 0.6, H * 0.52, 0.8, 1.8);
   marl.fadeTo(1, 1.6);
-  await wait(3200, signal);
+  await wait(3800, signal);
   marl.roam();
 
   await talk.say("The bell has struck One. They come.", { voice: "marl", puppet: marl, signal });
