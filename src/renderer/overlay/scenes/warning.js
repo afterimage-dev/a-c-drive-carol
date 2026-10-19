@@ -44,7 +44,7 @@ export async function warning(ctx) {
       marl.roam();
     }
   }
-  const answer = await talk.ask(lines.at(-1), [["here", "I shall be here"], ["notTonight", "Not tonight, spirit"], ["now", "Bring them now", true]], { voice: "marl", puppet: marl, signal, auto: "now" });
+  const answer = await talk.ask(lines.at(-1), [["here", "I shall be here"], ["notTonight", "Not tonight, spirit"], ["now", "Bring them now", true]], { voice: "marl", puppet: marl, signal, auto: ctx.settings.autoAnswer || "now" });
   ctx.carol.answer(answer);
 
   const R = night.marlware.replies;

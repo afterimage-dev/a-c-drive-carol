@@ -8,7 +8,12 @@ const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<":
 async function render() {
   const info = await carol.get();
   document.querySelectorAll("[data-place]").forEach((e) => { e.textContent = info.places[e.dataset.place] || e.dataset.place; e.title = e.textContent; });
-  document.querySelector(".cloud").hidden = !info.places.cloud;
+  const synced = info.places.synced || [], note = document.querySelector(".cloud");
+  note.hidden = !synced.length;
+  if (synced.length) {
+    const names = synced.join(" and ");
+    note.textContent = `Your ${names} ${synced.length === 1 ? "folder is" : "folders are"} synced to OneDrive, so the spirits never move files from there${synced.includes("Documents") ? ", and the Crypt lives in your home folder instead" : ""}. Nothing is uploaded.`;
+  }
   $("sound").checked = info.settings.sound;
   $("startWithWindows").checked = info.settings.startWithWindows;
   $("version").textContent = `Version ${info.version}`;

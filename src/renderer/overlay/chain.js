@@ -3,6 +3,9 @@
 // drawn as sprites in the spirits' world so it shows on the same phosphor as he does.
 
 const DT = 1 / 480, ITER = 8;
+// Sound: a link only clinks again once it has really moved away from where it last clinked (MIN_TRAVEL link
+// pitches, measured as distance, so jitter never adds up), and the whole chain is capped at a few clinks a second.
+const MIN_TRAVEL = 1.5, MAX_CLINKS_PER_SECOND = 4;
 const HAND = [298, 485];   // his chain hand, in the body sprite's pixels (assets/landmarks.json)
 const FILE = { w: 40, h: 50, pad: 9, scale: 3 };
 
@@ -43,6 +46,7 @@ export class Chain {
     this.tmp = { x: 0, y: 0 };
     this.events = [];
     this.snapMax = 0; this.slide = 0;
+    this.clinkBudget = MAX_CLINKS_PER_SECOND;
     this.build();
     this.off = stage.add((t, dt) => this.update(dt));
   }
@@ -62,6 +66,7 @@ export class Chain {
     const count = this.count = N + 2 + fileAt.length;
     this.X = new Float32Array(count); this.Y = new Float32Array(count); this.PX = new Float32Array(count); this.PY = new Float32Array(count);
     this.IM = new Float32Array(count); this.R = new Float32Array(count);
+    this.heardX = new Float32Array(count); this.heardY = new Float32Array(count);   // where each point last made a sound
     const { X, Y, PX, PY, IM, R, P, Lp, Fk } = this;
     const h0 = this.hand(), rc = P * 0.42;
     const place = (i, along) => {
@@ -108,7 +113,11 @@ export class Chain {
       s.anchor.set(0.5); this.view.addChild(s); p.sprite = s;
     }
     for (let k = 0; k < 1100; k++) this.step(DT, true);   // settle before the first frame
+    this.heardX.set(this.X); this.heardY.set(this.Y);
   }
+
+  /** How far point i is from where it last made a sound. */
+  moved(i) { return Math.hypot(this.X[i] - this.heardX[i], this.Y[i] - this.heardY[i]); }
 
   solveMax(a, b, rest) {
     const { X, Y, IM } = this;
@@ -157,7 +166,7 @@ export class Chain {
       const w = IM[a] + IM[b]; if (!w) continue;
       const d = Math.sqrt(d2) || 1e-4, nx = dx / d, ny = dy / d;
       const rv = ((X[b] - PX[b]) - (X[a] - PX[a])) * nx + ((Y[b] - PY[b]) - (Y[a] - PY[a])) * ny;
-      if (!silent && rv < -thr) this.events.push({ s: (-rv / dt) / S, x: X[a] });
+      if (!silent && rv < -thr) this.events.push({ s: (-rv / dt) / S, x: X[a], i: this.moved(a) > this.moved(b) ? a : b });
       const f = (rs - d) / w;
       X[a] -= nx * f * IM[a]; Y[a] -= ny * f * IM[a]; X[b] += nx * f * IM[b]; Y[b] += ny * f * IM[b];
       PX[a] += (X[a] - PX[a]) * 0.03 * (IM[a] > 0); PY[a] += (Y[a] - PY[a]) * 0.03 * (IM[a] > 0);
@@ -169,7 +178,7 @@ export class Chain {
       const r = R[i], lim = floorY - r;
       if (Y[i] >= lim) {
         const vy = Y[i] - PY[i];
-        if (!silent && vy > thr) this.events.push({ s: (vy / dt) / S, x: X[i] });
+        if (!silent && vy > thr) this.events.push({ s: (vy / dt) / S, x: X[i], i });
         Y[i] = lim; PY[i] = lim + vy * 0.1;
         const vx = X[i] - PX[i];
         if (Math.abs(vx) <= mu) PX[i] = X[i]; else PX[i] = X[i] - (vx - Math.sign(vx) * mu);
@@ -213,18 +222,26 @@ export class Chain {
   sounds() {
     const snd = this.sound;
     if (!snd || this.view.alpha < 0.2) { this.events.length = 0; return; }
-    if (this.snapMax > this.P * 0.06) this.events.push({ s: Math.min(1.5, this.snapMax / this.P * 4), x: this.X[0] });
+    const now = performance.now(), dt = Math.min(0.1, (now - (this.lastSoundCheck || now)) / 1000);
+    this.lastSoundCheck = now;
+    this.clinkBudget = Math.min(MAX_CLINKS_PER_SECOND, this.clinkBudget + dt * MAX_CLINKS_PER_SECOND);
+    const minTravel = this.P * MIN_TRAVEL;
+    // the chain snapping taut only counts when the hand has actually pulled it
+    if (this.snapMax > this.P * 0.12) this.events.push({ s: Math.min(1.5, this.snapMax / this.P * 4), x: this.X[0], i: 0 });
     this.events.sort((a, b) => b.s - a.s);
     let played = 0;
-    const now = performance.now();
     for (const ev of this.events) {
-      if (played >= 3) break;
-      const s = Math.min(1, (ev.s - 0.5) / 3.5); if (s <= 0) break;
-      if (now - (this.lastClink || 0) < 24 && played > 0) break;
-      snd.clink(s * 0.8, (ev.x / this.stage.W) * 2 - 1); this.lastClink = now; played++;
+      if (played >= 2 || this.clinkBudget < 1) break;
+      const s = Math.min(1, (ev.s - 0.8) / 3.5); if (s <= 0) break;
+      if (this.moved(ev.i) < minTravel) continue;   // it hasn't really moved since it last clinked
+      if (now - (this.lastClink || 0) < 45) break;
+      snd.clink(s * 0.75, (ev.x / this.stage.W) * 2 - 1);
+      this.heardX[ev.i] = this.X[ev.i]; this.heardY[ev.i] = this.Y[ev.i];
+      this.lastClink = now; this.clinkBudget -= 1; played++;
     }
     this.events.length = 0;
-    snd.scrape(Math.min(0.22, this.slide * 0.004));
+    // a scrape only for real dragging, not for a link settling on the floor
+    snd.scrape(this.slide > 6 ? Math.min(0.16, (this.slide - 6) * 0.003) : 0);
   }
 
   /** The nearest link or pendant to (x, y), within reach; -1 if none. */

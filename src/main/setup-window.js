@@ -10,7 +10,7 @@ export function openSetup({ preload, root, dev = false }) {
   if (win && !win.isDestroyed()) { win.show(); win.focus(); return win; }
   win = new BrowserWindow({
     width: 560,
-    height: 720,
+    height: 780,
     minWidth: 480,
     minHeight: 560,
     title: "A C-Drive Carol",

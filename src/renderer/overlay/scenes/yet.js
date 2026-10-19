@@ -15,15 +15,16 @@ export async function yet(ctx) {
   backdrop.set({ dim: 0.86, flicker: 0.25 }, { dim: 0.12 });
   stage.ramp = "yet";
   stage.setCellFor(H * 0.74);
-  const sp = stage.summon("yet", { home: [0.68, 0.5], height: 0.74, wander: [0.004, 0.004], alpha: 0 });
-  sp.jump(W * 0.9, H * 0.52);
+  // he stands on the left and points right, so your thoughts (low on the left) never cover the stone
+  const sp = stage.summon("yet", { home: [0.34, 0.46], height: 0.7, wander: [0.004, 0.004], facing: -1, alpha: 0 });
+  sp.jump(W * 0.12, H * 0.48);
   sp.k = 0.9; sp.d = 1.5;
   sp.fadeTo(1, 4);
   const stone = ctx.stone = new Stone(stage, sound);
-  stone.layout({ x: W * 0.27, baseY: (ctx.floorY ?? H) + 6, size: 0.44 });
+  stone.layout({ x: W * 0.72, baseY: (ctx.floorY ?? H) + 6, size: 0.44 });
   await wait(3600, signal);
 
-  const think = (text) => talk.say(text, { voice: "you", at: "topLeft", signal, hold: 2600 + text.length * 30 });
+  const think = (text) => talk.say(text, { voice: "you", signal, hold: 2600 + text.length * 30 });
   await think("I fear you more than any spectre I have seen.");
   await think("You are about to show me the shadows of the drive that will be?");
   await wait(1400, signal);   // no answer

@@ -10,7 +10,7 @@ import { Overlay } from "./overlay.js";
 import { createTray } from "./tray.js";
 import { openSetup, setupWindow, closeSetup } from "./setup-window.js";
 import { loadSettings, saveSettings } from "./settings.js";
-import { appFolder, cryptFolder, sampleFolder, cloudFolders } from "./places.js";
+import { appFolder, cryptFolder, sampleFolder, cloudFolders, isInside } from "./places.js";
 import { scanReal, buildSample } from "./scanner.js";
 import { prepareNight, omenFiles } from "./night.js";
 import { applyMemory, remember } from "./memory.js";
@@ -69,11 +69,16 @@ export class Controller {
     await this.overlay.create();
     this.timer = setInterval(() => this.poll(), this.flags.fast ? 1000 : 5000);
 
-    if (this.flags.demo) {
+    if (this.flags.omen) {
+      await this.prepare("sample");
+      this.omen(this.flags.omen);
+      this.capture();
+    } else if (this.flags.demo) {
       this.settings.consented = true;
       await this.begin("sample", { visitNow: !!this.flags.scene });
-    } else if (!this.settings.consented) {
+    } else if (!this.settings.consented || this.flags.setup) {
       this.openSetup();
+      if (this.flags.setup) this.capture();
     } else if (!this.flags.hidden) {
       this.tray.setTip("A C-Drive Carol · the spirits wait in the tray");
     }
@@ -87,7 +92,7 @@ export class Controller {
   }
 
   rendererSettings() {
-    return { sound: this.settings.sound, volume: this.settings.volume, glow: this.settings.glow, dev: !!this.flags.dev, autoplay: !!this.flags.autoplay, startAt: this.flags.scene || null, fast: !!this.flags.fast };
+    return { sound: this.settings.sound, volume: this.settings.volume, glow: this.settings.glow, dev: !!this.flags.dev, autoplay: !!this.flags.autoplay, autoAnswer: this.flags.answer, startAt: this.flags.scene || null, fast: !!this.flags.fast };
   }
 
   // ---------- the scheduler ----------
@@ -113,7 +118,7 @@ export class Controller {
       const idle = powerMonitor.getSystemIdleTime();
       const returned = this.lastIdle > 600 && idle < 5;
       this.lastIdle = idle;
-      const { safe, reasons } = await checkSafe({ idleSeconds: () => idle, minIdle: this.flags.fast ? 2 : 10 });
+      const { safe, reasons } = await checkSafe({ idleSeconds: () => idle, minIdle: this.flags.fast ? 0 : 10 });
       if (this.flags.dev && !safe) console.log("Not a safe moment:", reasons.join(", "));
       if (returned) this.dispatch({ type: "returned", safe });
       this.dispatch({ type: "tick", safe });
@@ -290,7 +295,7 @@ export class Controller {
 
     ipcMain.handle("setup:get", () => ({
       settings: { consented: this.settings.consented, sound: this.settings.sound, volume: this.settings.volume, startWithWindows: this.settings.startWithWindows, glow: this.settings.glow },
-      places: { ...this.places.roots, crypt: this.places.crypt, cloud: this.places.cloud.length > 0 },
+      places: { ...this.places.roots, crypt: this.places.crypt, synced: Object.keys(this.places.roots).filter((k) => this.places.cloud.some((c) => isInside(this.places.roots[k], c))) },
       resting: this.restingSummary(),
       version: app.getVersion()
     }));
@@ -319,9 +324,12 @@ export class Controller {
   capture() {
     const { capture, captureAt } = this.flags;
     if (!capture || !this.overlay.win) return;
+    const target = () => (this.flags.setup ? setupWindow() : this.overlay.win);
     const times = String(captureAt || "4").split(",").map(Number).filter((n) => n >= 0);
     times.forEach((t, i) => setTimeout(async () => {
-      const img = await this.overlay.win.webContents.capturePage();
+      const win = target();
+      if (!win) return;
+      const img = await win.webContents.capturePage();
       const file = times.length > 1 ? capture.replace(/(\.png)?$/, `-${i}.png`) : capture;
       fs.writeFileSync(file, img.toPNG());
       console.log("Captured", file);

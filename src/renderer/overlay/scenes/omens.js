@@ -15,6 +15,8 @@ export async function omen(ctx, { kind, files = [], icons = {} }) {
     const f = files[0];
     const src = f && icons[f.id];
     const holder = new PIXI.Container();
+    const glow = new PIXI.Sprite(ctx.softTexture()); glow.anchor.set(0.5); glow.width = glow.height = 110; glow.tint = 0x8ff0ee; glow.alpha = 0.35; glow.blendMode = PIXI.BLEND_MODES.ADD;
+    holder.addChild(glow);
     if (src) {
       const tex = PIXI.Texture.from(src);
       const s = new PIXI.Sprite(tex); s.anchor.set(0.5); s.width = s.height = 48; s.texture.baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST;
@@ -24,7 +26,7 @@ export async function omen(ctx, { kind, files = [], icons = {} }) {
       holder.addChild(g);
     }
     if (f) {
-      const label = new PIXI.Text(f.name, new PIXI.TextStyle({ fontFamily: "JetBrains Mono", fontSize: 12, fill: "#dffcfb" }));
+      const label = new PIXI.Text(f.name, new PIXI.TextStyle({ fontFamily: "JetBrains Mono", fontSize: 12, fill: "#eafffe", dropShadow: true, dropShadowColor: "#0b1a22", dropShadowBlur: 5, dropShadowDistance: 0 }));
       label.anchor.set(0.5, 0); label.y = 30; label.resolution = 2; holder.addChild(label);
     }
     holder.alpha = 0;
@@ -36,7 +38,7 @@ export async function omen(ctx, { kind, files = [], icons = {} }) {
         t += dt;
         const k = t / 3.4;
         holder.position.set(stage.W * (0.08 + 0.5 * k), y0 + Math.sin(t * 2.4) * 6);
-        holder.alpha = 0.55 * Math.sin(Math.PI * Math.min(1, k));
+        holder.alpha = 0.75 * Math.sin(Math.PI * Math.min(1, k));
         if (k >= 1) { off(); resolve(); }
       });
     });

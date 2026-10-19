@@ -9,7 +9,7 @@ const VOICES = {
   marl: { who: "Jacob Marlware", mode: "type", cps: 24 },
   past: { who: "The Ghost of Downloads Past", mode: "words", wps: 3.2 },
   present: { who: "The Ghost of Filesystems Present", mode: "words", wps: 4.6 },
-  you: { who: "You", mode: "fade" },
+  you: { who: "", mode: "fade", quote: true, at: "lowerLeft" },   // your own lines: large, in quotes, from where you sit
   narrator: { who: "", mode: "fade" },
   tiny: { who: "Tiny.tmp", mode: "type", cps: 16, plain: true }
 };
@@ -38,6 +38,7 @@ export class Dialogue {
   async say(text, { voice = "marl", who, puppet = null, at, hold, signal, linger = false } = {}) {
     if (!text) return;
     const v = VOICES[voice] || VOICES.marl;
+    if (v.quote) text = `\u201C${text}\u201D`;
     const card = this.card;
     card.className = `card v-${voice}`;
     const label = who ?? v.who;
@@ -48,7 +49,7 @@ export class Dialogue {
     const txt = card.querySelector(v.mode === "type" ? ".typed" : ".txt");
     const rest = card.querySelector(".rest");
     if (v.mode === "fade") { rest.textContent = ""; txt.textContent = text; }
-    this.line = { text, v, voice, puppet, at: at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: words ? [...txt.querySelectorAll(".w")] : null, resolve: null };
+    this.line = { text, v, voice, puppet, at: at || v.at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: words ? [...txt.querySelectorAll(".w")] : null, resolve: null };
     requestAnimationFrame(() => card.classList.add("on"));
     this.place();
     try {
@@ -177,6 +178,7 @@ export class Dialogue {
       y = clamp(top.y - bh - 10, 12, floor - bh - 12);
     } else if (L.at === "top") { x = (W - bw) / 2; y = Math.round(H * 0.07); }
     else if (L.at === "topLeft") { x = Math.round(W * 0.06); y = Math.round(H * 0.08); }
+    else if (L.at === "lowerLeft") { x = Math.round(W * 0.06); y = floor - bh - Math.round(H * 0.07); }
     else if (L.at === "centre") { x = (W - bw) / 2; y = (H - bh) / 2 - H * 0.12; }
     else { x = (W - bw) / 2; y = floor - bh - Math.round(H * 0.08); }
     card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;

@@ -4,7 +4,7 @@
 import { clamp } from "./util.js";
 
 const PANEL = [266, 150], ANGLE = 0.125;   // the blank panel and its tilt (assets/landmarks.json)
-const LINES = [{ y: -46, size: 24, alpha: 1 }, { y: -6, size: 17, alpha: 1 }, { y: 34, size: 15, alpha: 0.6 }];
+const LINES = [{ y: -44, size: 21, alpha: 1 }, { y: -8, size: 15, alpha: 1 }, { y: 28, size: 14, alpha: 0.7 }];
 
 const VERT = `attribute vec2 aVertexPosition; attribute vec2 aTextureCoord; uniform mat3 projectionMatrix; uniform mat3 translationMatrix; uniform mat3 uTextureMatrix; varying vec2 vTextureCoord;
   void main(void){ gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0); vTextureCoord = (uTextureMatrix * vec3(aTextureCoord, 1.0)).xy; }`;
@@ -39,7 +39,7 @@ export class Stone {
     this.carve.position.set(PANEL[0] - w / 2, PANEL[1] - h);
     this.root.addChild(this.carve);
     this.texts = LINES.map((l) => {
-      const tx = new PIXI.Text("", new PIXI.TextStyle({ fontFamily: "Cinzel", fontWeight: "700", fontSize: l.size, fill: "#1a2133", letterSpacing: 1, dropShadow: true, dropShadowColor: "#e6fbff", dropShadowAlpha: 0.55 * l.alpha, dropShadowBlur: 0, dropShadowAngle: Math.PI / 2, dropShadowDistance: 1.5 }));
+      const tx = new PIXI.Text("", new PIXI.TextStyle({ fontFamily: "Cinzel", fontWeight: "700", fontSize: l.size, fill: "#0e121c", letterSpacing: 1, dropShadow: true, dropShadowColor: "#f2fdff", dropShadowAlpha: 0.85 * l.alpha, dropShadowBlur: 0, dropShadowAngle: Math.PI / 2, dropShadowDistance: 1.5 }));
       tx.anchor.set(0.5); tx.y = l.y; tx.alpha = l.alpha; tx.resolution = 2;
       this.carve.addChild(tx);
       return tx;
