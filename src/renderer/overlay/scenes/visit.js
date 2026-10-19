@@ -15,7 +15,7 @@ const STAVES = { bell, past, present, yet, morning };
 const DAY = 86400000;
 
 /** Tonight's queue: what you chose for each file, last choice wins. */
-function queue() {
+export function queue() {
   const choice = new Map();   // id -> { kind, file }
   return {
     add(kind, file) { choice.set(file.id, { kind, file }); },

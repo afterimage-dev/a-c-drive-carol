@@ -27,7 +27,7 @@ export class Dialogue {
     this.line = null;
     this.frozen = false;   // while choices are showing, lines don't move on by themselves
     this.autoplay = false; // development: choose for the user
-    stage.add((t, dt) => this.step(dt));
+    stage.addAlways((t, dt) => this.step(dt));
   }
 
   /**

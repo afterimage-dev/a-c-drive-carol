@@ -13,7 +13,9 @@ import { loadSettings, saveSettings } from "./settings.js";
 import { appFolder, cryptFolder, sampleFolder, cloudFolders, isInside } from "./places.js";
 import { scanReal, buildSample } from "./scanner.js";
 import { prepareNight, omenFiles, omenWord } from "./night.js";
-import { applyMemory, remember } from "./memory.js";
+import { applyMemory, remember, returningFiles } from "./memory.js";
+import { DownloadWatcher } from "./watcher.js";
+import { describe, placeOf } from "../../core/scan.js";
 import { iconsFor } from "./icons.js";
 import { captureDesktop } from "./capture.js";
 import { initialState, restore, step, needsPolling } from "./scheduler.js";
@@ -52,6 +54,8 @@ export class Controller {
     };
     if (flags.roots) {   // development: haunt a test folder instead of your own
       const r = path.resolve(flags.roots);
+      this.settings.consented = true;
+      this.settings.realNights = true;
       this.places.roots = { Downloads: path.join(r, "Downloads"), Desktop: path.join(r, "Desktop"), Documents: path.join(r, "Documents") };
       this.places.crypt = path.join(r, "Crypt");
     }
@@ -74,9 +78,16 @@ export class Controller {
     powerMonitor.on("unlock-screen", () => this.dispatch({ type: "returned", safe: true }));
     powerMonitor.on("resume", () => this.poll());
     await this.overlay.create();
+    if (this.flags.wisp) {
+      const st = fs.statSync(this.flags.wisp);
+      this.settings.realNights = true;
+      this.settings.banished = [{ path: path.resolve(this.flags.wisp), size: st.size, until: new Date(Date.now() - 1000).toISOString(), times: 1 }];
+      this.lastWispCheck = 0;
+    }
     if (this.flags.link) { this.settings.chainLinkUntil = new Date(Date.now() + 86400000).toISOString(); this.capture(); }
-    this.timer = setInterval(() => { this.poll(); this.checkLink(); }, this.flags.fast ? 1000 : 5000);
+    this.timer = setInterval(() => { this.poll(); this.checkLink(); this.afterwards(); }, this.flags.fast ? 1000 : 5000);
     this.checkLink();
+    this.watchDownloads();
 
     if (this.flags.omen) {
       await this.prepare("sample");
@@ -144,6 +155,77 @@ export class Controller {
     else this.link.show({ sound: this.settings.sound, volume: this.settings.volume });
   }
 
+  // ---------- afterwards: a new twin in Downloads, a banished file returning ----------
+  /** Only once you've let the spirits look at your real folders: a sample night alone never starts the watcher. */
+  watchDownloads() {
+    if (!this.settings.consented || !this.settings.realNights || this.watcher) return;
+    this.watcher = new DownloadWatcher({ ...this.places, onTwin: (files) => { this.pendingApparition = { kind: "twin", files }; } });
+    this.watcher.start();
+  }
+
+  /** Every few seconds: show a waiting apparition at a safe moment, or notice a banished file that has come back. */
+  async afterwards() {
+    if (this.scene || this.busy || this.afterBusy || this.sched.phase !== "idle") return;
+    if (!this.pendingApparition && this.settings.realNights && Date.now() - (this.lastWispCheck || 0) > (this.flags.fast ? 5000 : 3600000)) {
+      this.lastWispCheck = Date.now();
+      for (const b of returningFiles(this.settings)) {
+        try {
+          const st = fs.statSync(b.path, { bigint: true });
+          if (Number(st.size) !== b.size) continue;
+          const files = describe([{ abs: b.path, rel: placeOf(b.path, this.places.roots) || "Downloads", st }], this.places);
+          files[0].timesBanished = b.times || 1;
+          this.pendingApparition = { kind: "wisp", files };
+          break;
+        } catch { /* gone: nothing returns */ }
+      }
+    }
+    if (!this.pendingApparition) return;
+    this.afterBusy = true;
+    try {
+      const { safe } = await checkSafe({ idleSeconds: () => powerMonitor.getSystemIdleTime(), minIdle: this.flags.fast ? 0 : 3 });
+      if (safe && !this.scene) { const a = this.pendingApparition; this.pendingApparition = null; await this.apparition(a.kind, a.files); }
+    } finally {
+      this.afterBusy = false;
+    }
+  }
+
+  /** A twin flickers, or a wisp drifts, at the edge of the screen. Touch it for a visit about just that. */
+  async apparition(kind, files) {
+    if (this.flags.dev) console.log(`Apparition: ${kind} for ${files.map((f) => f.name).join(", ")}`);
+    const m = { version: 1, mode: "real", createdAt: new Date().toISOString(), roots: this.places.roots, crypt: this.places.crypt, accessTimesReliable: false,
+      drive: this.lastDrive || { total: 0, free: 0, growthPerMonth: 1, simulated: false },
+      files: files.map((f) => ({ ...f, group: kind === "twin" ? "g1" : null })),
+      groups: kind === "twin" ? [{ id: "g1", hash: "", members: files.map((f) => f.id) }] : [] };
+    this.mini = { kind, manifest: m, night: prepareNight(m), icons: await iconsFor(m.files) };
+    this.link.hide();
+    this.scene = "apparition";
+    await this.overlay.passive();
+    this.overlay.send("scene", { name: "apparition", kind, files: this.mini.night[kind === "twin" ? "present" : "past"], icons: this.mini.icons, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+    this.capture();
+  }
+
+  async startMini() {
+    const mini = this.mini;
+    if (!mini) return;
+    if (this.flags.dev) console.log(`Short visit: ${mini.kind}`);
+    this.scene = "mini";
+    this.woke = false;
+    this.manifest = mini.manifest;
+    this.overlay.hide();
+    await delay(250);
+    const backdrop = this.flags.noBackdrop ? null : await captureDesktop();
+    await this.overlay.visit();
+    this.overlay.send("scene", { name: "mini", kind: mini.kind, night: mini.night, icons: mini.icons, backdrop: backdrop ? new Uint8Array(backdrop) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+  }
+
+  endMini() {
+    if (this.flags.dev) console.log("Short visit over");
+    this.scene = null;
+    this.mini = null;
+    this.manifest = null;
+    this.overlay.hide();
+  }
+
   // ---------- the night ----------
   summon(mode) {
     if (!this.settings.consented) { this.openSetup(); return; }
@@ -187,6 +269,8 @@ export class Controller {
       });
     }
     this.manifest = applyMemory(m, this.settings);
+    this.lastDrive = m.drive;
+    if (mode === "real" && !this.settings.realNights) { this.settings.realNights = true; this.watchDownloads(); }
     this.night = prepareNight(this.manifest, { again, fled: this.sched.fled, previousCount: this.settings.lastCount ?? null });
     this.settings.lastCount = this.manifest.files.length;
     const shown = new Map();
@@ -228,6 +312,7 @@ export class Controller {
   }
 
   onEsc() {
+    if (this.scene === "mini") { this.overlay.send("esc"); this.endMini(); return; }
     if (this.scene !== "visit") return;
     this.overlay.send("esc");
     this.overlay.hide();
@@ -245,7 +330,7 @@ export class Controller {
     const toRest = [...new Set([...ids(decisions.rest), ...ids(decisions.impostors)])];
     const result = layToRest(m, toRest);
     this.woke = true;
-    this.settings = remember(this.settings, m, { banish: ids(decisions.banish), keep: ids(decisions.keep) });
+    this.settings = remember(this.settings, m, { banish: ids(decisions.banish), keep: ids(decisions.keep), rest: result.moved });
     this.settings.chainLinkUntil = new Date(Date.now() + DAY).toISOString();
     const byId = new Map(m.files.map((f) => [f.id, f]));
     const bytes = result.moved.reduce((s, id) => s + (byId.get(id)?.size || 0), 0);
@@ -290,12 +375,17 @@ export class Controller {
   wireIpc() {
     ipcMain.on("overlay:hover", (_e, over) => this.overlay.hover(over));
     ipcMain.on("overlay:answer", (_e, answer) => { if (["here", "now", "notTonight"].includes(answer)) this.dispatch({ type: "answer", answer }); });
-    ipcMain.on("overlay:done", (_e, what) => {
+    ipcMain.on("overlay:done", (_e, what, data) => {
       if (what === "warning" || what === "omen") {
         this.scene = null;
         if (this.pendingVisit) this.startVisit();
         else this.overlay.hide();
         if (what === "warning" && this.sched.phase === "warning") this.dispatch({ type: "dismissed" });
+      } else if (what === "apparition") {
+        if (data?.summon) this.startMini(); else { this.scene = null; this.mini = null; this.overlay.hide(); }
+      } else if (what === "mini") {
+        this.endMini();
+        setTimeout(() => this.checkLink(), 1500);
       } else if (what === "morning") {
         this.scene = null;
         this.overlay.hide();
@@ -349,8 +439,9 @@ export class Controller {
     const times = String(captureAt || "4").split(",").map(Number).filter((n) => n >= 0);
     times.forEach((t, i) => setTimeout(async () => {
       const win = target();
-      if (!win) return;
-      const img = await win.webContents.capturePage();
+      if (!win || !win.isVisible()) return;
+      const img = await win.webContents.capturePage().catch(() => null);
+      if (!img) return;
       const file = times.length > 1 ? capture.replace(/(\.png)?$/, `-${i}.png`) : capture;
       fs.writeFileSync(file, img.toPNG());
       console.log("Captured", file);

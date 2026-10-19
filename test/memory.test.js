@@ -59,3 +59,10 @@ test("sample nights are never remembered", () => {
   assert.deepEqual(s.kept, []);
   assert.equal(applyMemory(sampleM, { kept: [{ path: m.files[0].path, size: 10 }], banished: [] }), sampleM);
 });
+
+test("a returning file laid to rest is no longer banished", () => {
+  const now = 1e12;
+  let s = remember(fresh(), m, { banish: ["d"] }, now);
+  s = remember(s, m, { rest: ["d"] }, now + 31 * DAY);
+  assert.deepEqual(s.banished, []);
+});

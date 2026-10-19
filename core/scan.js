@@ -32,7 +32,7 @@ const KINDS = {
   code: ["js", "ts", "py", "java", "c", "cpp", "cs", "go", "rs", "rb", "php", "json", "html", "css", "ipynb"]
 };
 const EXT_KIND = Object.fromEntries(Object.entries(KINDS).flatMap(([k, exts]) => exts.map((e) => [e, k])));
-const kindOf = (name) => EXT_KIND[path.extname(name).slice(1).toLowerCase()] || "other";
+export const kindOf = (name) => EXT_KIND[path.extname(name).slice(1).toLowerCase()] || "other";
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "$recycle.bin", "appdata", "a c-drive carol", "my games", "windowspowershell", "zoom"]);
 const DEPTH = { Downloads: 2, Desktop: 1, Documents: 3 };
@@ -165,7 +165,7 @@ function matchApp(product, fileName, apps) {
 const versionFromName = (name) => (/(\d+(?:\.\d+){1,3})/.exec(name) || [])[1] || null;
 
 // ---------- Duplicates ----------
-function hashFile(abs, limit = Infinity) {
+export function hashFile(abs, limit = Infinity) {
   const h = crypto.createHash("sha256");
   const fd = fs.openSync(abs, "r");
   try {
@@ -174,6 +174,35 @@ function hashFile(abs, limit = Infinity) {
     while (pos < limit && (n = fs.readSync(fd, buf, 0, Math.min(buf.length, limit - pos), pos)) > 0) { h.update(buf.subarray(0, n)); pos += n; }
   } finally { fs.closeSync(fd); }
   return h.digest("hex");
+}
+
+/** Files in the roots (same depths and skips as the scan) that are exactly `size` bytes, except `except`. */
+export function findSameSize(roots, size, except = null) {
+  const found = [];
+  for (const [name, p] of Object.entries(roots)) if (fs.existsSync(p)) walk(name, p, found);
+  const skip = except ? path.resolve(except).toLowerCase() : null;
+  return found.filter((f) => Number(f.st.size) === size && path.resolve(f.abs).toLowerCase() !== skip).map((f) => ({ abs: f.abs, rel: f.rel, st: f.st }));
+}
+
+/** Describe specific files as a manifest would, for a visit about just them (a new twin, a returning file). */
+export function describe(entries, { roots, crypt, cloud = [] }) {
+  return entries.map(({ abs, rel, st }, i) => {
+    const born = Number(st.birthtimeMs) || Number(st.mtimeMs);
+    return {
+      id: `x${i}`, path: abs, name: path.basename(abs), folder: rel, kind: kindOf(abs), size: Number(st.size),
+      downloadedAt: new Date(born).toISOString(), lastOpenedAt: null, origin: originOf(abs), hash: null, group: null,
+      installer: null, timesBanished: 0, cloudSynced: cloud.length ? within(abs, cloud) : false, simulated: []
+    };
+  });
+}
+
+/** Which root a path is in, and its folder relative to it ("Downloads", "Documents/Reports"), or null. */
+export function placeOf(abs, roots) {
+  for (const [name, root] of Object.entries(roots)) {
+    const rel = path.relative(root, path.dirname(abs));
+    if (!rel.startsWith("..") && !path.isAbsolute(rel)) return rel ? `${name}/${rel.split(path.sep).join("/")}` : name;
+  }
+  return null;
 }
 
 // ---------- The scan ----------

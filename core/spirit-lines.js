@@ -173,7 +173,7 @@ export const LINES = {
   },
 
   returning: [
-    "I told you I would return. I have, {times} now.",
+    "Banished {times}, and back again. I told you I would return.",
     "Banished, and back again. We are patient, we who wait in {folder}.",
     "Thirty days you sent me away for. I counted them.",
     "Back, as I said. You cannot banish a file forever. Only decide.",

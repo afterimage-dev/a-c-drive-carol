@@ -28,11 +28,14 @@ export function applyMemory(m, { kept = [], banished = [] }, now = Date.now()) {
   return { ...m, files: files.map((f) => (f.group && !grouped.has(f.id) ? { ...f, group: null } : f)), groups };
 }
 
-/** Settings updated with tonight's banished and kept files. Returns a new object. */
-export function remember(settings, m, { banish = [], keep = [] }, now = Date.now()) {
+/** Settings updated with tonight's banished and kept files (and laid-to-rest ones forgotten). Returns a new object. */
+export function remember(settings, m, { banish = [], keep = [], rest = [] }, now = Date.now()) {
   if (m.mode !== "real") return settings;
   const byId = new Map(m.files.map((f) => [f.id, f]));
   let kept = [...settings.kept], banished = [...settings.banished];
+  for (const id of rest) {   // laid to rest: no longer banished, so it never returns as a wisp
+    const f = byId.get(id); if (f) banished = banished.filter((b) => !same(b, f));
+  }
   for (const id of keep) {
     const f = byId.get(id); if (!f) continue;
     banished = banished.filter((b) => !same(b, f));

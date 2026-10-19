@@ -114,7 +114,8 @@ export async function createStage(host) {
     reduced: reducedMotion(),
     ptr: { x: W * 0.5, y: H * 0.4, seen: false, history: [] },
     puppets: new Set(),
-    updaters: new Set(),
+    updaters: new Set(),     // per scene: cleared between scenes
+    always: new Set(),       // for the life of the overlay (the dialogue)
     ramp: "marl",
     focus: null,
     glowStrength: 1,
@@ -156,6 +157,7 @@ export async function createStage(host) {
   };
   stage.setCellFor = (spiritHeight) => stage.sys.setCell(clamp(Math.round(3 * spiritHeight / 650), 2, 8));
   stage.add = (fn) => { stage.updaters.add(fn); return () => stage.updaters.delete(fn); };
+  stage.addAlways = (fn) => { stage.always.add(fn); return () => stage.always.delete(fn); };
   stage.clear = () => {
     const sys = stage.sys;
     for (const p of [...stage.puppets]) p.remove();
@@ -185,6 +187,7 @@ export async function createStage(host) {
     while (P.history.length && P.history[0].t < t - 1.2) P.history.shift();
     const sys = stage.sys;
     sys.light.x = P.x; sys.light.y = P.y; sys.light.z = stage.ramp === "yet" ? 160 : 260;
+    for (const fn of stage.always) fn(t, dt);
     for (const fn of stage.updaters) fn(t, dt);
     for (const p of stage.puppets) p.update(t, dt);
     const lead = [...stage.puppets].at(-1);
