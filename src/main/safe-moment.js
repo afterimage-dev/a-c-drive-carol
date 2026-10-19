@@ -11,7 +11,7 @@ const WIN = process.platform === "win32";
 export const QUNS = { 1: "nobody is at the screen", 2: "a fullscreen app is open", 3: "a fullscreen game is running", 4: "presentation mode is on", 5: "ok", 6: "quiet hours are on", 7: "a fullscreen app is open" };
 
 let shq;
-function notificationState() {
+export function notificationState() {
   if (!WIN) return 5;
   try {
     if (shq === undefined) {

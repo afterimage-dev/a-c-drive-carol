@@ -106,4 +106,11 @@ export function omenFiles(m, count = 3) {
   return pastCandidates(m, { minAgeDays: 30, limit: count }).slice(0, count).map((f) => ({ id: f.id, name: f.name, path: f.path }));
 }
 
+/** The word traced through the breath on the glass: the size of the heaviest old download. */
+export function omenWord(m) {
+  const old = pastCandidates(m, { minAgeDays: 30, limit: 50 });
+  const big = old.reduce((a, f) => (!a || f.size > a.size ? f : a), null);
+  return big ? humanSize(big.size) : null;
+}
+
 export { humanSize, DAY };

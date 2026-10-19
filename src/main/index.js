@@ -17,6 +17,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --answer=X       with --autoplay, answer Marlware with X (here | notTonight | now)
 //   --omen=X         show one omen on the sample files (passing | cold | rattle | notification)
 //   --setup          open the settings window (with --capture, pictures are taken of it)
+//   --link           leave the morning-after chain link out (with --capture, pictures are taken of it)
 //   --esc-at=N       press Esc N seconds into a visit (to check that nothing is applied)
 //   --demo=real      start a real-mode night at once  --roots=DIR  scan DIR\Downloads, \Desktop, \Documents instead of yours
 const argv = process.argv.slice(1);
@@ -37,6 +38,7 @@ const flags = {
   answer: devAllowed ? value("answer") : null,
   omen: devAllowed ? value("omen") : null,
   setup: !!flag("setup"),
+  link: devAllowed && !!flag("link"),
   escAt: devAllowed ? Number(value("esc-at")) || null : null,
   hidden: !!flag("hidden")
 };

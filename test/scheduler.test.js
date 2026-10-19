@@ -31,6 +31,11 @@ test("I shall be here waits 8 to 30 minutes with three omens, then visits at a s
   assert.deepEqual(omens.map((a) => a.kind || a.type), ["rattle", "passing", "cold", "visit"]);
 });
 
+test("the middle omen is sometimes breath on the glass", () => {
+  const { state } = run(initialState(), [{ type: "warned", now: 0 }, { type: "answer", answer: "here", now: 0 }], { rand: () => 0.2 });
+  assert.equal(state.omens[1].kind, "breath");
+});
+
 test("the omen without sound is a notification instead of a rattle", () => {
   const { state } = run(initialState(), [{ type: "warned", now: 0 }, { type: "answer", answer: "here", now: 0 }], { sound: false });
   assert.equal(state.omens[0].kind, "notification");

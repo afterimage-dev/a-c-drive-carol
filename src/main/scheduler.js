@@ -51,7 +51,7 @@ export function step(state, ev, { scale = 1, sound = true, rand = Math.random, w
         s.deadline = (s.warnedAt ?? now) + HALF_HOUR * scale;
         s.omens = [
           { kind: sound ? "rattle" : "notification", at: now + wait / 3, done: false },
-          { kind: "passing", at: now + (wait * 2) / 3, done: false },
+          { kind: rand() < 0.5 ? "breath" : "passing", at: now + (wait * 2) / 3, done: false },
           { kind: "cold", at: Math.max(now, s.visitAt - COLD_LEAD * scale), done: false }
         ];
       } else if (ev.answer === "notTonight") {

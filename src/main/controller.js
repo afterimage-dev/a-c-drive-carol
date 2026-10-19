@@ -12,12 +12,13 @@ import { openSetup, setupWindow, closeSetup } from "./setup-window.js";
 import { loadSettings, saveSettings } from "./settings.js";
 import { appFolder, cryptFolder, sampleFolder, cloudFolders, isInside } from "./places.js";
 import { scanReal, buildSample } from "./scanner.js";
-import { prepareNight, omenFiles } from "./night.js";
+import { prepareNight, omenFiles, omenWord } from "./night.js";
 import { applyMemory, remember } from "./memory.js";
 import { iconsFor } from "./icons.js";
 import { captureDesktop } from "./capture.js";
 import { initialState, restore, step, needsPolling } from "./scheduler.js";
-import { checkSafe } from "./safe-moment.js";
+import { checkSafe, notificationState } from "./safe-moment.js";
+import { ChainLink } from "./link.js";
 
 const DAY = 86400000;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -61,6 +62,7 @@ export class Controller {
     const preloadDir = path.join(this.root, "src", "preload");
     this.overlay = new Overlay({ preload: path.join(preloadDir, "overlay.cjs"), onEsc: () => this.onEsc(), dev: this.flags.dev });
     this.setupPreload = path.join(preloadDir, "setup.cjs");
+    this.link = new ChainLink({ preload: path.join(preloadDir, "link.cjs"), dev: this.flags.dev, onTaken: () => { this.settings.chainLinkUntil = null; this.save(); } });
     this.tray = createTray(this.root, {
       summon: (mode) => this.summon(mode),
       openCrypt: () => this.openCrypt(),
@@ -72,7 +74,9 @@ export class Controller {
     powerMonitor.on("unlock-screen", () => this.dispatch({ type: "returned", safe: true }));
     powerMonitor.on("resume", () => this.poll());
     await this.overlay.create();
-    this.timer = setInterval(() => this.poll(), this.flags.fast ? 1000 : 5000);
+    if (this.flags.link) { this.settings.chainLinkUntil = new Date(Date.now() + 86400000).toISOString(); this.capture(); }
+    this.timer = setInterval(() => { this.poll(); this.checkLink(); }, this.flags.fast ? 1000 : 5000);
+    this.checkLink();
 
     if (this.flags.omen) {
       await this.prepare("sample");
@@ -132,6 +136,14 @@ export class Controller {
     }
   }
 
+  /** The morning-after chain link: there until picked up or a day has passed; never over fullscreen apps or scenes. */
+  checkLink() {
+    const until = Date.parse(this.settings.chainLinkUntil || "") || 0;
+    if (until <= Date.now()) { if (this.link.open) this.link.close(); return; }
+    if (this.scene || notificationState() !== 5) this.link.hide();
+    else this.link.show({ sound: this.settings.sound, volume: this.settings.volume });
+  }
+
   // ---------- the night ----------
   summon(mode) {
     if (!this.settings.consented) { this.openSetup(); return; }
@@ -148,6 +160,7 @@ export class Controller {
       await this.prepare(mode, { again, onProgress });
       if (visitNow) { this.dispatch({ type: "summoned" }); return; }
       this.dispatch({ type: "warned" });
+      this.link.hide();
       await this.overlay.passive();
       this.scene = "warning";
       this.overlay.send("scene", { name: "warning", night: this.night, icons: this.icons, refusals: this.sched.refusals, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
@@ -190,6 +203,7 @@ export class Controller {
     }
     this.scene = "visit";
     this.woke = false;
+    this.link.hide();
     this.overlay.hide();
     await delay(250);   // let Windows take the overlay off the screen before the picture is taken
     const backdrop = this.flags.noBackdrop ? null : await captureDesktop();
@@ -210,7 +224,7 @@ export class Controller {
     if (kind === "rattle") { this.overlay.send("omen", { kind, settings: this.rendererSettings() }); return; }   // sound only
     this.scene = "omen";
     await this.overlay.passive();
-    this.overlay.send("omen", { kind, files: files.map((f) => ({ id: f.id, name: f.name })), icons, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
+    this.overlay.send("omen", { kind, files: files.map((f) => ({ id: f.id, name: f.name })), icons, word: this.manifest ? omenWord(this.manifest) : null, workArea: this.overlay.workArea(), size: this.overlay.size(), settings: this.rendererSettings() });
   }
 
   onEsc() {
@@ -287,6 +301,7 @@ export class Controller {
         this.overlay.hide();
         this.night = null;
         this.dispatch({ type: "visitEnded", completed: true });
+        setTimeout(() => this.checkLink(), 1500);   // something left behind
       }
     });
     ipcMain.handle("overlay:wake", (_e, decisions) => this.wake(decisions || {}));
@@ -330,7 +345,7 @@ export class Controller {
   capture() {
     const { capture, captureAt } = this.flags;
     if (!capture || !this.overlay.win) return;
-    const target = () => (this.flags.setup ? setupWindow() : this.overlay.win);
+    const target = () => (this.flags.setup ? setupWindow() : this.flags.link ? this.link.win : this.overlay.win);
     const times = String(captureAt || "4").split(",").map(Number).filter((n) => n >= 0);
     times.forEach((t, i) => setTimeout(async () => {
       const win = target();

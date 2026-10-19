@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { makeSample } from "../core/make-sample.js";
-import { prepareNight, omenFiles } from "../src/main/night.js";
+import { prepareNight, omenFiles, omenWord } from "../src/main/night.js";
 import { tempDir } from "./helpers.js";
 
 test("Marlware's warning carries the real weight and length of the chain", (t) => {
@@ -18,6 +18,7 @@ test("Marlware's warning carries the real weight and length of the chain", (t) =
   assert.equal(n.present.extraCopies, 5);
   assert.ok(n.chain.biggest[0].size >= n.chain.biggest.at(-1).size);
   assert.ok(omenFiles(m).length > 0);
+  assert.equal(omenWord(m), "5.8 GB", "the breath on the glass spells the heaviest old download");
 });
 
 test("a repeat warning is shorter, and one after fleeing says so", (t) => {
