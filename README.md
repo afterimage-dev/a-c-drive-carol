@@ -45,6 +45,7 @@ Yard #5 asks entries to keep it harmless: opt-in, reversible, on your own stuff 
 - **Opt-in at every step.** Nothing happens until you agree on first run. You choose when the spirits come. Nothing moves until you confirm the final review.
 - **Your own stuff only.** It only looks inside your own Downloads, Desktop and Documents folders. Never system folders, other users, network drives or removable drives.
 - **It doesn't spread.** Files are moved, never copied, and only within your own drive. The app has no network access at all, and it doesn't start with Windows unless you switch that on.
+- **Nothing goes to the cloud.** Files in OneDrive-synced folders are never moved, and the Crypt is never placed inside OneDrive, so laying a file to rest can't upload it or remove it from your other devices.
 - **Nothing leaves your computer.** There are no AI calls and no analytics. Every line the spirits say comes from a bank of written templates filled in locally.
 
 ## Demo mode: a haunting with nothing at stake
@@ -59,11 +60,13 @@ Every haunting runs on a **manifest**: a description of the files, the drive, an
 
 | File | What it does |
 | --- | --- |
-| [`scan.js`](scan.js) | Reads your folders and builds a real manifest. Read-only: it never moves, changes or sends anything. |
-| [`make-sample.js`](make-sample.js) | Builds the demo folder and its manifest from [`sample-manifest.json`](sample-manifest.json). |
-| [`manifest.js`](manifest.js) | Chooses who haunts: old files for the Past, duplicate groups for the Present, the forecast for the gravestone. Turns each file into its lines. |
-| [`spirit-lines.js`](spirit-lines.js) | The bank of lines, with helpers that fill them from real file details and avoid repeats. |
-| [`crypt.js`](crypt.js) | Lay to rest and Resurrect. Moves only, with a log; no deletion. |
+| [`core/scan.js`](core/scan.js) | Reads your folders and builds a real manifest. Read-only: it never moves, changes or sends anything. |
+| [`core/make-sample.js`](core/make-sample.js) | Builds the demo folder and its manifest from [`core/sample-manifest.json`](core/sample-manifest.json). |
+| [`core/manifest.js`](core/manifest.js) | Chooses who haunts: old files for the Past, duplicate groups for the Present, the forecast for the gravestone. Turns each file into its lines. |
+| [`core/spirit-lines.js`](core/spirit-lines.js) | The bank of lines, with helpers that fill them from real file details and avoid repeats. |
+| [`core/crypt.js`](core/crypt.js) | Lay to rest and Resurrect. Moves only, with a log; no deletion. |
+| [`src/main/`](src/main) | The Electron app: tray, setup window, the overlay, the scheduler (when the spirits come), safe-moment checks, and the network lock. |
+| [`src/renderer/overlay/`](src/renderer/overlay) | The haunting itself: the phosphor spirits (PixiJS), Marlware's physics chain, the gravestone, the dialogue and the five staves. |
 
 **Finding duplicates.** Files are grouped by size first, since only files of the same size can match. Candidates then get a quick hash of their first 64 KB, and only files that still match get a full SHA-256. Files that live only in the cloud (OneDrive placeholders) are skipped, because reading them would force a download. Hard links to the same file aren't counted as duplicates.
 
@@ -73,18 +76,37 @@ Every haunting runs on a **manifest**: a description of the files, the drive, an
 
 **The gravestone.** The forecast divides your free space by how fast your folders have grown over the last six months. The second date shows the same forecast with tonight's Crypt buried.
 
-## Try the core
+**A safe moment.** Before an omen or a visit, the app asks Windows whether it's a good time to interrupt (the same check notifications use, which says no during fullscreen apps, games, presentations and quiet hours), reads the registry to see whether any app is using the camera or microphone right now, and waits until you've stopped typing for ten seconds.
 
-Requires Node.js 18.15 or newer. Windows gives the full picture; on other systems the Windows-only details (installed apps, download origins, cloud-only files) are skipped.
+**No network, enforced.** Every request from every window is cancelled unless it's one of the app's own files, and the app's browser engine is told that no host name exists. A test checks the source for any code that deletes files, copies them, or talks to the web.
+
+## Run it
+
+Windows 10 or 11, with [Node.js](https://nodejs.org) 22 or newer.
+
+```sh
+git clone https://github.com/afterimage-dev/a-c-drive-carol.git
+cd a-c-drive-carol
+npm install
+npm start
+```
+
+The setup window explains what the app does and offers two ways in: **Haunt my computer** (a real, read-only scan of your Downloads, Desktop and Documents) or **Summon the spirits with sample files**. After that it lives in the tray: *Summon the spirits*, *Summon with sample files*, *Open the Crypt*, *Resurrect everything*, *Settings*, *Quit*. When Marlware warns you, choose **Bring them now** to skip the wait.
+
+`npm test` runs the tests. `npm run dist` builds an installer and a portable `.exe` into `dist/` (unsigned, so Windows SmartScreen will ask before running it).
+
+### Try the core on its own
+
+The core needs only Node.js 18.15 or newer, and runs on any system. Windows gives the full picture; elsewhere the Windows-only details (installed apps, download origins, cloud-only files) are skipped.
 
 ```sh
 # Build the demo night and hear what each spirit would say
-node make-sample.js
-node manifest.js "%USERPROFILE%\Documents\A C-Drive Carol\Sample\manifest.json"
+node core/make-sample.js
+node core/manifest.js "%USERPROFILE%\Documents\A C-Drive Carol\Sample\manifest.json"
 
 # Scan your own folders (read-only) into a manifest
-node scan.js my-manifest.json
-node manifest.js my-manifest.json
+node core/scan.js my-manifest.json
+node core/manifest.js my-manifest.json
 ```
 
 ## Credits
