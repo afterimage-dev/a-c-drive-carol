@@ -75,6 +75,7 @@ export async function mini(ctx, { kind, backdrop: bytes }) {
     await say("Another brother! Come, come.");
     const row = presentRow(ctx, g);
     await row.argue();
+    row.offer();
     if (ctx.settings.autoplay) setTimeout(() => row.choose(g.original), 1500);
     const picked = await Promise.race([row.choice(), until(() => {}, signal)]);
     if (picked === "all") {

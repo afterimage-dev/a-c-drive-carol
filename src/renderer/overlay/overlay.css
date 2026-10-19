@@ -133,7 +133,8 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
 .copy .name { font-weight: 600; color: #fff; word-break: break-all; }
 .copy .meta { color: var(--dim); font-size: 11px; }
 .copy .claim { min-height: 3.6em; }
-.copy button { justify-self: start; }
+.copy button { justify-self: start; transition: opacity .4s; }
+.row.waiting button { opacity: 0; pointer-events: none; }
 .copy.impostor { opacity: 0; transform: translateY(60px) rotate(var(--tilt, 4deg)); filter: blur(5px); transition: opacity 1s .2s, transform 1.2s cubic-bezier(.5, 0, .9, .5), filter 1s; }
 .copy.real { border-color: #9dff9f; }
 .copy .stays { color: #ffd9a0; font-size: 11px; }

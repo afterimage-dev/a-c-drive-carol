@@ -156,11 +156,14 @@ export class Sound {
       mix.gain.value = 0; src.connect(a); src.connect(b); a.connect(g); b.connect(g); g.gain.value = 0.6; g.connect(mix);
       const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = 0.21; lg.gain.value = 0.05; lfo.connect(lg); lg.connect(mix.gain);
       mix.connect(this.out(1, -0.2, 0.5)); src.start(); lfo.start();
-      mix.gain.setTargetAtTime(0.09, ac.currentTime, 1.2);
+      mix.gain.setTargetAtTime(0.045, ac.currentTime, 1.6);
       this.loops.wind = { mix, src, lfo };
     } else if (!on && this.loops.wind) {
-      const w = this.loops.wind, t = this.ac.currentTime;
-      w.mix.gain.setTargetAtTime(0, t, fast ? 0.04 : 0.6); w.src.stop(t + 3); w.lfo.stop(t + 3);
+      const w = this.loops.wind, t = this.ac.currentTime, g = w.mix.gain, now = g.value;
+      g.cancelScheduledValues(t); g.setValueAtTime(now, t);
+      if (fast) { g.linearRampToValueAtTime(now * 1.7, t + 0.3); g.linearRampToValueAtTime(0, t + 0.95); }   // a last gust, sucked away
+      else g.setTargetAtTime(0, t, 0.6);
+      w.src.stop(t + 3); w.lfo.stop(t + 3);
       this.loops.wind = null;
     }
   }

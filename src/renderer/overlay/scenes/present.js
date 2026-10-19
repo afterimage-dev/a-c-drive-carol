@@ -55,6 +55,7 @@ export async function present(ctx) {
         await say("The test cannot tell them apart. So listen to them.");
         await say("The eldest, in the tidiest house, has the best claim. But the choice is yours.");
       }
+      row.offer();
       if (ctx.settings.autoplay) setTimeout(() => row.choose(gi % 2 === 0 ? g.original : "all"), 1500);
       const picked = await Promise.race([row.choice(), enough, until(() => {}, signal)]);
       if (picked === "enough") { await row.remove(); break; }

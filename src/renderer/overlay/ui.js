@@ -110,7 +110,7 @@ export async function fileCard(ctx, f, { auto = null } = {}) {
  * real") or "all" ("keep them all"); `fall(id)` sends every other copy tumbling.
  */
 export function presentRow(ctx, group) {
-  const row = el("div", "row interactive");
+  const row = el("div", "row interactive waiting");   // the buttons appear only once you can use them
   row.style.bottom = `${Math.round(ctx.stage.H - (ctx.floorY ?? ctx.stage.H) + 74)}px`;   // just above the dock, growing upwards
   const shown = group.files.slice(0, 4);
   const extra = group.files.length - shown.length;
@@ -146,6 +146,8 @@ export function presentRow(ctx, group) {
       }
     },
     choice: () => chosen,
+    /** Show the buttons: the copies have argued and the spirit has finished. */
+    offer: () => row.classList.remove("waiting"),
     choose: (key) => resolveChoice(key),
     fall(realId) {
       cards.forEach((c) => c.classList.add(c.dataset.id === realId ? "real" : "impostor"));

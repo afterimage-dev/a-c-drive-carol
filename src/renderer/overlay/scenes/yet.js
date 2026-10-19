@@ -94,9 +94,9 @@ export async function yet(ctx) {
 
   // no answer. Silence: the wind stops dead. Then something heavy, close, and the stone rises.
   await wait(600, signal);
-  sound.wind(false, { fast: true });
-  await wait(2000, signal);
-  sound.thud();
+  sound.wind(false, { fast: true });   // a last gust, then nothing at all...
+  await wait(2400, signal);
+  sound.thud();                        // ...then something heavy, very close
   sound.heartbeat(56);
   const arm = stage.add((t, dt) => { sp.s.arm += (1 - sp.s.arm) * Math.min(1, dt * 1.5); });
   stone.raise();
