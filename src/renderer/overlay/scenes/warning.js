@@ -2,6 +2,7 @@
 // and clicks go straight through to your desktop everywhere except on him, his chain and his card.
 
 import { Chain } from "../chain.js";
+import { intro } from "./intro.js";
 import { wait, el, clamp } from "../util.js";
 
 /** Dark towards the far corners, clear around (fx, fy): a light pool round his corner, the rest in shadow. */
@@ -17,6 +18,7 @@ function cornerVignette(W, H, fx, fy) {
 
 export async function warning(ctx) {
   const { stage, talk, night, sound, signal } = ctx;
+  await intro(ctx);   // "Jacob Marlware was dead, to begin with." (Skip intro goes straight on)
   const { W, H } = stage;
   const floor = ctx.floorY;
   const h = H * 0.56 / 3 * 1.15;
