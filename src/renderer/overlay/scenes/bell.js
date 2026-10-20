@@ -19,14 +19,14 @@ export async function bell(ctx) {
   stage.ramp = "marl";
   const h = H * 0.56;
   stage.setCellFor(h);
-  const marl = stage.summon("marl", { home: [0.6, 0.5], height: 0.56, wander: [0.05, 0.02], flip: true, alpha: 0, pace: 0.45, k: 1.6, d: 2.4 });
+  const marl = stage.summon("marl", { home: [0.6, 0.5], height: 0.56, wander: [0.05, 0.02], flip: true, alpha: 0, pace: 0.45, k: 1.6, d: 2.4, heave: { period: 1.9, rest: 0.45 } });
   marl.jump(W + h * 0.6, H * 0.52);
   const exts = [...new Set(night.chain.biggest.map((f) => (f.ext ? "." + f.ext : ".?")))];
   const chain = new Chain(stage, marl, { links: 40, floorY: H - 4, exts, sound, walls: false, trail: 1 });
   // he drifts in slowly, dragging the chain behind him, then lets it settle
   marl.moveTo(W * 0.6, H * 0.52, 0.8, 1.8);
   marl.fadeTo(1, 1.6);
-  await wait(3800, signal);
+  await wait(5200, signal);
   marl.roam();
 
   await talk.say("The bell has struck One. They come.", { voice: "marl", puppet: marl, signal });
@@ -38,7 +38,7 @@ export async function bell(ctx) {
   sound.whoosh(1.6, 0.06);
   // keep rising until the last link of the chain has cleared the top of the screen
   marl.moveTo(marl.M.x - W * 0.05, -H * 2.6, 1.6, 1.7);
-  await Promise.race([chain.gone((e) => e.maxY < -20), wait(1e9, signal)]);
+  await Promise.race([chain.gone((e) => e.maxY < -20, 16000), wait(1e9, signal)]);
   chain.remove();
   marl.remove();
   sound.scrape(0);

@@ -207,7 +207,7 @@ export class Chain {
     // a taut chain tugs him along when you pull it
     if (this.grab.i > 0) {
       const h = this.hand(), i = this.grab.i, dx = this.X[i] - h.x, dy = this.Y[i] - h.y, d = Math.hypot(dx, dy);
-      if (d > this.grab.len) { const f = (d - this.grab.len) * 55; this.puppet.M.vx += dx / d * f * dt; this.puppet.M.vy += dy / d * f * dt; }
+      if (d > this.grab.len) { const f = (d - this.grab.len) * 26; this.puppet.M.vx += dx / d * f * dt; this.puppet.M.vy += dy / d * f * dt; }   // he's heavy to tug
     }
     this.draw();
     this.sounds();

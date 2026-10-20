@@ -24,7 +24,7 @@ async function loadTextures() {
 
 /** A spirit on the stage: springs towards where it's sent (or wanders near home), bobs, leans, glitches round. */
 export class Puppet {
-  constructor(stage, key, { home = [0.5, 0.58], height = 0.56, wander = [0.1, 0.04], flip = false, facing = 1, alpha = 0, pace = 1, k = 5, d = 3 } = {}) {
+  constructor(stage, key, { home = [0.5, 0.58], height = 0.56, wander = [0.1, 0.04], flip = false, facing = 1, alpha = 0, pace = 1, k = 5, d = 3, heave = null } = {}) {
     this.stage = stage;
     this.key = key;
     this.sp = stage.sys.spirit(key);
@@ -39,6 +39,10 @@ export class Puppet {
     this.pace = pace;              // how quickly it wanders (Marlware is weighed down by his chain)
     this.k0 = k; this.d0 = d;      // its natural spring: soft and slow means heavy
     this.k = k; this.d = d;
+    // heave: move in surges, as if hauling a dead weight. { period: seconds per pull, rest: share of it spent still }
+    this.heave = heave;
+    this.effort = 0;
+    this.heaveT = 0; this.heaveLen = heave ? heave.period : 1;
     this.extraY = 0;
     this.M = { x: stage.W * home[0], y: stage.H * home[1], vx: 0, vy: 0, lean: 0 };
     this.fade = null;
@@ -72,8 +76,22 @@ export class Puppet {
       tx = W * (this.home[0] + (reduced ? 0 : this.wander[0] * (Math.sin(s * 0.16) + 0.5 * Math.sin(s * 0.37 + 1.2)) / 1.5));
       ty = H * (this.home[1] + (reduced ? 0 : this.wander[1] * Math.sin(s * 0.27)));
     }
-    M.vx += (this.k * (tx - M.x) - this.d * M.vx) * dt;
-    M.vy += (this.k * (ty - M.y) - this.d * M.vy) * dt;
+    let k = this.k, d = this.d;
+    if (this.heave && !reduced) {
+      // each pull: strain, a heave forward, then the chain's weight stops him while he gathers strength again
+      this.heaveT += dt;
+      if (this.heaveT >= this.heaveLen) { this.heaveT -= this.heaveLen; this.heaveLen = this.heave.period * (0.8 + Math.random() * 0.5); }
+      const ph = this.heaveT / this.heaveLen, pull = 1 - this.heave.rest;
+      this.effort = ph < pull ? Math.pow(Math.sin(Math.PI * ph / pull), 2) : 0;
+      k *= 0.04 + 2.2 * this.effort;
+      d *= 1.2 + 2.6 * (1 - this.effort);
+    }
+    M.vx += (k * (tx - M.x) - d * M.vx) * dt;
+    M.vy += (k * (ty - M.y) - d * M.vy) * dt;
+    if (this.heave) {   // however hard he's pulled (or pulls), a man dragging that chain can't move fast
+      const v = Math.hypot(M.vx, M.vy), vmax = this.h * 0.9;
+      if (v > vmax) { M.vx *= vmax / v; M.vy *= vmax / v; }
+    }
     M.x += M.vx * dt; M.y += M.vy * dt;
     const bob = reduced ? 0 : Math.sin(t * 1.2 * this.c.m.speed * Math.min(1, 0.4 + this.pace)) * 6 * (this.key === "yet" ? 0.3 : 1) * (this.h / 600) + S.laugh * 5 * Math.abs(Math.sin(t * 9));
     if (this.flip && !reduced) {
@@ -84,8 +102,10 @@ export class Puppet {
         setTimeout(() => { this.turning = false; }, 260);
       }
     }
-    this.sp.place(M.x, M.y + bob + this.extraY, this.h, S.facing);
-    M.lean += (clamp(M.vx / 900, -0.14, 0.14) - M.lean) * Math.min(1, dt * 4);
+    const strain = this.heave ? this.effort * this.h * 0.012 : 0;   // he sinks a little with each pull
+    this.sp.place(M.x, M.y + bob + this.extraY + strain, this.h, S.facing);
+    const into = this.heave ? Math.sign(tx - M.x) * Math.min(1, Math.abs(tx - M.x) / 80) * 0.07 * this.effort : 0;   // and leans into it
+    M.lean += (clamp(M.vx / 900 + into, -0.16, 0.16) - M.lean) * Math.min(1, dt * 4);
     this.sp.root.rotation = reduced ? 0 : M.lean;
     S.vx = M.vx;
     S.look = { x: this.stage.ptr.x, y: this.stage.ptr.y };

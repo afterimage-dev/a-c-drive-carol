@@ -29,6 +29,18 @@ function softTexture() {
 
 let run = null;   // { kind, ctx, ac }
 
+// development: the leading spirit's speed, five times a second, in lines of 30 (--trace)
+let traced = [], traceT = 0;
+stage.app.ticker.add(() => {
+  if (!run?.ctx.settings.trace) return;
+  traceT += stage.app.ticker.deltaMS;
+  if (traceT < 200) return;
+  traceT = 0;
+  const lead = [...stage.puppets].at(-1);
+  if (lead) traced.push(Math.round(Math.hypot(lead.M.vx, lead.M.vy)));
+  if (traced.length >= 30) { carol.log(`speed ${traced.join(" ")}`); traced = []; }
+});
+
 // development: report the frame rate while something is on screen
 let frames = 0, since = performance.now();
 stage.app.ticker.add(() => {

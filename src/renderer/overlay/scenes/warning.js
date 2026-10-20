@@ -25,7 +25,7 @@ export async function warning(ctx) {
   stage.sys.fog = 0;   // no fog over your whole desktop for a warning
   const x = W - h * 0.55 - 36, y = floor - h * 0.62;
 
-  const marl = stage.summon("marl", { home: [x / W, y / H], height: h / H, wander: [0.012, 0.006], flip: false, alpha: 0, pace: 0.45, k: 1.6, d: 2.4 });
+  const marl = stage.summon("marl", { home: [x / W, y / H], height: h / H, wander: [0.012, 0.006], flip: false, alpha: 0, pace: 0.45, k: 1.6, d: 2.4, heave: { period: 1.9, rest: 0.45 } });
   marl.jump(x, y);
 
   // the rest of the screen darkens towards its other three corners; his corner stays as it was
@@ -100,7 +100,7 @@ export async function warning(ctx) {
     // until the whole chain has been dragged off the right edge
     chain.walls = false;
     marl.moveTo(W + h * 6, y + h * 0.05, 1.2, 2.2);
-    await Promise.race([chain.gone((e) => e.minX > W + 20), wait(1e9, signal)]);
+    await Promise.race([chain.gone((e) => e.minX > W + 20, 18000), wait(1e9, signal)]);
   } else {
     stage.glitch(0.35);
     sound.whoosh(1.2, 0.07);
