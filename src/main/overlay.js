@@ -46,9 +46,8 @@ export class Overlay {
     win.setAlwaysOnTop(true, "screen-saver");
     win.setIgnoreMouseEvents(true, { forward: true });
     win.on("closed", () => { this.win = null; this.releaseEsc(); });
-    if (this.dev) win.webContents.on("console-message", (e, lvl, msg, line, src) => {
-      const level = e.level ?? ["verbose", "info", "warning", "error"][lvl] ?? lvl, message = e.message ?? msg;
-      if (level === "error" || level === "warning" || level === 2 || level === 3) console.log(`[overlay ${level}] ${message} (${e.sourceId ?? src}:${e.lineNumber ?? line})`);
+    if (this.dev) win.webContents.on("console-message", (e) => {
+      if (e.level === "error" || e.level === "warning") console.log(`[overlay ${e.level}] ${e.message} (${e.sourceId}:${e.lineNumber})`);
     });
     this.ready = new Promise((resolve) => win.webContents.once("did-finish-load", resolve));
     win.loadURL(`${ORIGIN}/src/renderer/overlay/index.html`);

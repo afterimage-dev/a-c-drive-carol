@@ -3,6 +3,7 @@
 
 import { app, ipcMain, shell, Notification, powerMonitor } from "electron";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { layToRest, resurrect, resting } from "../../core/crypt.js";
 import { forecast } from "../../core/manifest.js";
@@ -276,7 +277,7 @@ export class Controller {
     this.manifest = applyMemory(m, this.settings);
     this.lastDrive = m.drive;
     if (mode === "real" && !this.settings.realNights) { this.settings.realNights = true; this.watchDownloads(); }
-    this.night = prepareNight(this.manifest, { again, fled: this.sched.fled, previousCount: this.settings.lastCount ?? null });
+    this.night = prepareNight(this.manifest, { again, fled: this.sched.fled, previousCount: this.settings.lastCount ?? null, account: os.userInfo().username });
     this.settings.lastCount = this.manifest.files.length;
     const shown = new Map();
     for (const f of [...this.night.past, ...this.night.chain.biggest, ...this.night.present.groups.flatMap((g) => g.files)]) shown.set(f.id, f);

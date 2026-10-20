@@ -4,6 +4,7 @@
 import path from "node:path";
 import { pastCandidates, presentGroups, linesFor, claimLine, epitaphFor, humanSize, facts } from "../../core/manifest.js";
 import { pick, LINES } from "../../core/spirit-lines.js";
+import { graveName, ownerLine, causeOfDeath } from "../../core/epitaph.js";
 
 const DAY = 86400000;
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -40,9 +41,10 @@ function card(f, m) {
 
 /**
  * @param {import("../../core/manifest.js").Manifest} m
- * @param {{ again?: boolean, fled?: boolean, previousCount?: number }} [opts]  previousCount: files at the last warning
+ * @param {{ again?: boolean, fled?: boolean, previousCount?: number, account?: string }} [opts]
+ *   previousCount: files at the last warning · account: the Windows account name, for the gravestone
  */
-export function prepareNight(m, { again = false, fled = false, previousCount = null } = {}) {
+export function prepareNight(m, { again = false, fled = false, previousCount = null, account = "" } = {}) {
   const total = m.files.reduce((s, f) => s + f.size, 0);
   const anySimulatedSize = m.files.some((f) => f.simulated.includes("size"));
 
@@ -92,6 +94,7 @@ export function prepareNight(m, { again = false, fled = false, previousCount = n
     past,
     present: { groups, extraCopies },
     drive: { ...m.drive },
+    grave: { owner: ownerLine(graveName(account)), cause: causeOfDeath(m) },
     lines: {
       pastReactions: LINES.pastReactions,
       presentReactions: LINES.presentReactions,

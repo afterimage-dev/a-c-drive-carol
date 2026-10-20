@@ -1,13 +1,15 @@
 // Stave Four · The Spirit of Disk Space Yet to Come. He never speaks. The screen goes dark but for your candle, and
 // he can only be seen where its light falls; your thoughts wait until you've found him. He never moves while you're
 // looking: when your light leaves him there's a black, glitched instant and he's nearer. Everything falls silent, a
-// thud, and a gravestone rises to carve the month your drive will be full, while a heartbeat quickens and your candle
-// gutters. If you chose anything tonight, a second, later date carves itself beneath, and the flame steadies.
+// thud, and a frosted gravestone rises. The chisel carves beneath the frost; your candle has to melt it to read your
+// own name, what your drive died of, and how long it has, while a heartbeat quickens and your candle gutters. If you
+// chose anything tonight the date is scratched out and carved later; if not, it's carved again, deeper.
 
 import { title } from "../ui.js";
 import { Stone } from "../stone.js";
 import { darkness } from "../backdrop.js";
 import { wait, tween, until, clamp } from "../util.js";
+import { daysUntil, fullLine, redemption } from "../../../../core/epitaph.js";
 
 // where he stands at each step closer: x and height as fractions of the screen; the candle gutters as he nears
 const STEPS = [
@@ -19,7 +21,7 @@ const STEPS = [
 const PARTS = [[256, 108], [300, 300], [52, 406], [380, 432], [300, 560]];   // hood, chest, pointing hand, hand, robe
 
 export async function yet(ctx) {
-  const { stage, talk, sound, signal, decisions, backdrop, carol } = ctx;
+  const { stage, talk, sound, signal, decisions, backdrop, carol, night } = ctx;
   const { W, H } = stage;
   await title(ctx, "Stave Four", "The Last of the Spirits");
 
@@ -42,7 +44,7 @@ export async function yet(ctx) {
   stage.setCellFor(H * STEPS[0].h);
   sp.fadeTo(1, 3);
   const stone = ctx.stone = new Stone(stage, sound);
-  stone.layout({ x: W * 0.74, baseY: (ctx.floorY ?? H) + 6, size: 0.44 });
+  stone.layout({ x: W * 0.73, baseY: (ctx.floorY ?? H) + 6, size: 0.54 });
   stone.ambient = 0.1; stone.fall = 0.00004;
 
   // how well your candle lights him, 0..1, and his shedding pixels follow it so they don't give him away
@@ -61,7 +63,7 @@ export async function yet(ctx) {
       held = lit() > 0.35 ? held + dt * 1000 : 0;
       waited += dt * 1000;
       if (!glinted && waited > 10000) { glinted = true; tween(1400, (k) => { sp.s.pins = Math.sin(Math.PI * k); }, signal).catch(() => {}); }
-      if (held >= ms || waited > 25000) { off(); resolve(); }
+      if (held >= ms || waited > (ctx.settings.autoplay ? 3000 : 25000)) { off(); resolve(); }
     });
   }, signal);
 
@@ -92,37 +94,75 @@ export async function yet(ctx) {
   await think("You are about to show me the shadows of the drive that will be?");
   await closer();
 
-  // no answer. Silence: the wind stops dead. Then something heavy, close, and the stone rises.
+  // no answer. Silence: the wind stops dead. Then something heavy, close, and the stone rises, frosted over.
   await wait(600, signal);
   sound.wind(false, { fast: true });   // a last gust, then nothing at all...
   await wait(2400, signal);
   sound.thud();                        // ...then something heavy, very close
   sound.heartbeat(56);
   const arm = stage.add((t, dt) => { sp.s.arm += (1 - sp.s.arm) * Math.min(1, dt * 1.5); });
+  stone.frost();
   stone.raise();
   await wait(1800, signal);
   sound.wind(true);
   const now = await carol.forecast(0);
-  sound.heartbeat(72);
-  await stone.carveLine(0, "HERE LIES C:");
-  sound.heartbeat(88);
-  await stone.carveLine(1, `FULL · ${now?.fullLabel ?? "SOON"}`);
-  sound.heartbeat(100);
+  const days = now ? daysUntil(now.full) : 365;
+  const grave = night.grave ?? { owner: "YOUR C:", cause: "DIED OF DOWNLOADS" };
+
+  // the chisel works beneath the frost: you hear every letter, but you can't read them yet
+  sound.heartbeat(66);
+  await stone.carveLine(0, "HERE LIES");
+  await wait(1100, signal);                                  // a pause before the name
+  await stone.carveLine(1, grave.owner, { speed: 4.5 });
+  sound.heartbeat(80);
+  await stone.carveLine(2, grave.cause);
+  await stone.carveLine(3, fullLine(days));
+  sound.heartbeat(92);
+
+  // read it: bring your light to the stone and melt the frost. When your own name comes clear, your heart stops.
+  await until((resolve) => {
+    let t = 0, since = 0, named = false;
+    const off = stage.add((_t, dt) => {
+      t += dt; since += dt;
+      if (since < 0.25) return;
+      since = 0;
+      if (!named && stone.cleared(1) > 0.5) {
+        named = true;
+        sound.heartbeat(0);
+        setTimeout(() => sound.heartbeat(112), 1600);
+      }
+      const all = stone.cleared();
+      if (all > 0.6 || t > (ctx.settings.autoplay ? 5 : 30)) {   // or, if you never come, the frost thaws by itself
+        off();
+        if (all <= 0.6) { stone.thaw(); if (!named) sound.heartbeat(104); }
+        resolve();
+      }
+    });
+  }, signal);
   await wait(1400, signal);
 
   await think("Are these the shadows of the things that will be, or of things that may be, only?");
   await closer();
-  sound.heartbeat(112);
   sp.s.tremble = 1;
   await tween(1600, (k) => { sp.s.pins = k; }, signal);
 
+  // what tonight changed: the date scratched out and carved later, or the days it bought carved beneath. If
+  // nothing, the same date is carved again, deeper, and the candle all but goes out.
   const queued = decisions.queuedBytes();
+  let redeemed = false;
   if (queued > 0) {
     const later = await carol.forecast(queued);
+    const change = redemption(days, later ? daysUntil(later.redeemed) : days);
     await wait(600, signal);
-    await stone.carveLine(2, `OR · ${later?.redeemedLabel ?? ""}`);
+    if (change.kind === "rewrite") { await stone.strike(3); await stone.carveLine(3, change.line, { speed: 6 }); redeemed = true; }
+    else if (change.kind === "more") { await stone.carveLine(4, change.line); redeemed = true; }
+  }
+  if (redeemed) {
     flame.gutter = 0; dark.gutter = 0;   // the flame steadies
     sound.heartbeat(74);
+  } else {
+    await stone.deepen(3);
+    flame.gutter = 1; dark.gutter = 1;
   }
   await wait(1200, signal);
 

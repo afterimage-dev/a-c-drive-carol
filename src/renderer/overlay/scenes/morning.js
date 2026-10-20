@@ -15,6 +15,7 @@ export async function morning(ctx) {
   backdrop.set({ dim: 0.18, frost: 0, warp: 0, flicker: 0 }, { dim: 0.45, frost: 0.35, warp: 4, flicker: 1 });
   // the stone stands behind the review, waiting to break
   const stone = ctx.stone || new Stone(stage, sound);
+  stone.thaw();   // any frost left on it melts with the morning
   await tween(600, (k) => { stone.alpha = 1 - k; }, signal);
   stone.layout({ x: W / 2, baseY: H * 0.9, size: 0.6 });
   stone.raise();

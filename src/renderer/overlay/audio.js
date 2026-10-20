@@ -248,15 +248,39 @@ export class Sound {
     }
   }
 
-  /** The stone breaking. */
+  /** A crack running through stone: dry splintering ticks. */
+  crackle() {
+    if (!this.enabled) return;
+    const ac = this.ensure(), t0 = ac.currentTime, out = this.out(0.35, 0, 0.4);
+    for (let k = 0; k < 18; k++) {
+      const t = t0 + k * 0.03 + Math.random() * 0.02, n = this.noiseSource(), f = this.band(1500, 5000), g = ac.createGain();
+      g.gain.setValueAtTime(0.4 + Math.random() * 0.6, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02 + Math.random() * 0.03);
+      n.connect(f); f.connect(g); g.connect(out); n.start(t, Math.random()); n.stop(t + 0.06);
+    }
+  }
+
+  /** The stone breaking: a deep boom, a rumble of rock, and gravel falling after. */
   crack() {
     if (!this.enabled) return;
-    const ac = this.ensure(), t = ac.currentTime, out = this.out(0.3, 0, 0.5);
+    const ac = this.ensure(), t = ac.currentTime + 0.01, out = this.out(0.85, 0, 0.6);
+    // the boom
     const o = ac.createOscillator(), g = ac.createGain();
-    o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.5);
-    g.gain.setValueAtTime(0.8, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-    o.connect(g); g.connect(out); o.start(t); o.stop(t + 1);
-    for (let k = 0; k < 6; k++) setTimeout(() => this.grind(), k * 60 + Math.random() * 40);
+    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(24, t + 0.9);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 1.9);
+    // the smash: a heavy burst of low noise, rolling into a rumble
+    const n = this.noiseSource(true), lp = ac.createBiquadFilter(), ng = ac.createGain();
+    lp.type = "lowpass"; lp.frequency.setValueAtTime(1600, t); lp.frequency.exponentialRampToValueAtTime(180, t + 1.6);
+    ng.gain.setValueAtTime(0.9, t); ng.gain.exponentialRampToValueAtTime(0.25, t + 0.25); ng.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+    n.connect(lp); lp.connect(ng); ng.connect(out); n.start(t); n.stop(t + 2.3);
+    // gravel: many small stones landing, thinning out
+    for (let k = 0; k < 40; k++) {
+      const at = t + 0.15 + Math.pow(Math.random(), 1.8) * 1.8, s = this.noiseSource(), f = this.band(600, 2600), sg = ac.createGain(), p = ac.createStereoPanner();
+      p.pan.value = (Math.random() - 0.5) * 0.9;
+      sg.gain.setValueAtTime(0.15 + Math.random() * 0.35, at); sg.gain.exponentialRampToValueAtTime(0.0001, at + 0.03 + Math.random() * 0.06);
+      s.connect(f); f.connect(sg); sg.connect(p); p.connect(out); s.start(at, Math.random()); s.stop(at + 0.1);
+    }
+    for (let k = 0; k < 5; k++) setTimeout(() => this.grind(), 120 + k * 90 + Math.random() * 60);
   }
 
   /** Change the background theme ("marl" | "past" | "present" | null), crossfading over a few seconds. */

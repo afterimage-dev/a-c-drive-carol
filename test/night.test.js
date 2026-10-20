@@ -19,6 +19,9 @@ test("Marlware's warning carries the real weight and length of the chain", (t) =
   assert.ok(n.chain.biggest[0].size >= n.chain.biggest.at(-1).size);
   assert.ok(omenFiles(m).length > 0);
   assert.equal(omenWord(m), "5.8 GB", "the breath on the glass spells the heaviest old download");
+  const named = prepareNight(m, { account: "nicholas.tweedale" });
+  assert.deepEqual(named.grave, { owner: "NICHOLAS'S C:", cause: "DIED OF ONE DISK IMAGE" });
+  assert.equal(prepareNight(m, { account: "Administrator" }).grave.owner, "YOUR C:");
 });
 
 test("a repeat warning is shorter, and one after fleeing says so", (t) => {
