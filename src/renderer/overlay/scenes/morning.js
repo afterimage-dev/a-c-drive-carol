@@ -32,7 +32,7 @@ export async function morning(ctx) {
   stone.crack();
   await panel.result(result);
   const tiny = panel.el.querySelector(".tiny");
-  const line = "And so, as Tiny.tmp observed: Git bless us, every one, and every zero.";
+  const line = "And so, as Tiny.tmp observed:\nGit bless us, every one, and every zero.";   // the quotation on its own line
   await tween(line.length * 55, (k) => { tiny.textContent = line.slice(0, Math.round(line.length * k)); }, signal, (k) => k);
   await wait(600, signal);
   panel.el.querySelectorAll(".note, .actions").forEach((e) => (e.style.opacity = "1"));
