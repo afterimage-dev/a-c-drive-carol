@@ -9,7 +9,7 @@ const PANEL = [266, 150], ANGLE = 0.125;   // the blank panel and its tilt (asse
 const LINES = [{ y: -57, size: 18, alpha: 1 }, { y: -30, size: 21, alpha: 1 }, { y: -6, size: 12, alpha: 1 }, { y: 16, size: 14, alpha: 1 }, { y: 37, size: 11, alpha: 0.85 }];
 const MAX_W = 150, MIN_FIT = 0.55;   // the panel is about 150 px across; long lines shrink to fit, down to 55%
 const FROST = { w: 220, h: 150, y: -10, k: 2 };   // the frost over the panel, in panel units (canvas at k x)
-const MELT = { cells: 2, radius: 42, rate: 0.6 };   // a thickness grid (panel units per cell); candle's melt radius (screen px); thickness per second
+const MELT = { cells: 2, radius: 42, rate: 0.85 };   // a thickness grid (panel units per cell); candle's melt radius (screen px); thickness per second
 
 /** The look of the frost: an opaque, mottled crust with ice crystals in it. How thick it is lives in a grid. */
 function frostCanvas() {
