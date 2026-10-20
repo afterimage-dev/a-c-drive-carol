@@ -44,12 +44,15 @@ export class Sound {
     this.verb = ac.createConvolver(); this.verb.buffer = imp;
     this.verbIn = ac.createGain(); this.verbIn.gain.value = 0.5;
     this.verbIn.connect(this.verb); this.verb.connect(this.master);
-    // an echo for the chain: a dark, repeating tail that gives it depth and weight
+    // an echo for the chain: a short, dark slap off the walls that gives it a room to be heavy in
     this.echoIn = ac.createGain(); this.echoIn.gain.value = 1;
-    const delay = ac.createDelay(1); delay.delayTime.value = 0.19;
-    const fb = ac.createGain(); fb.gain.value = 0.42;
-    const dark = ac.createBiquadFilter(); dark.type = "lowpass"; dark.frequency.value = 1400;
-    const wet = ac.createGain(); wet.gain.value = 0.5;
+    const delay = ac.createDelay(1); delay.delayTime.value = 0.09;
+    const fb = ac.createGain(); fb.gain.value = 0.22;
+    const dark = ac.createBiquadFilter(); dark.type = "lowpass"; dark.frequency.value = 1100;
+    const wet = ac.createGain(); wet.gain.value = 0.28;
+    // a little grit for iron (each clank gets its own shaper on this curve)
+    this.gritCurve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; this.gritCurve[i] = Math.tanh(x * 2.2) / Math.tanh(2.2); }
     this.echoIn.connect(delay); delay.connect(dark); dark.connect(fb); fb.connect(delay); dark.connect(wet); wet.connect(this.master); wet.connect(this.verbIn);
     const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), nd = nb.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -75,6 +78,7 @@ export class Sound {
     const p = ac.createStereoPanner(); p.pan.value = Math.max(-1, Math.min(1, pan));
     const s = ac.createGain(); s.gain.value = send;
     g.connect(p); p.connect(this.master); p.connect(s); s.connect(this.verbIn);
+    g.panner = p;
     return g;
   }
 
@@ -105,29 +109,57 @@ export class Sound {
   }
 
   /**
-   * A single clink: four inharmonic partials and a tick. Heavy (Marlware's chain) is an octave lower, rings longer,
-   * has a dull iron thud beneath it, and echoes; light (buttons) is small and bright.
+   * A single clink: four bar-like partials and a tick, small and bright (buttons). Heavy is Marlware's chain, which
+   * is iron, not this: see clank().
    */
   clink(strength = 0.6, pan = 0, send = 0.45, when = 0, { heavy = false } = {}) {
     if (!this.enabled) return;
-    const ac = this.ensure(), t = ac.currentTime + when, out = this.out((heavy ? 0.06 : 0.04) + (heavy ? 0.4 : 0.32) * Math.pow(strength, 1.2), pan, heavy ? 0.7 : send);
-    if (heavy) { const e = ac.createGain(); e.gain.value = 0.55; out.connect(e); e.connect(this.echoIn); }
-    const f = heavy ? rnd(420, 900) : rnd(1100, 2600), ring = heavy ? 2.2 : 1;
+    if (heavy) return this.clank(strength, pan, when);
+    const ac = this.ensure(), t = ac.currentTime + when, out = this.out(0.04 + 0.32 * Math.pow(strength, 1.2), pan, send);
+    const f = rnd(1100, 2600);
     for (const [m, a, d] of [[1, 1, 0.16], [2.76, 0.55, 0.11], [5.4, 0.32, 0.07], [8.93, 0.18, 0.045]]) {
       const o = ac.createOscillator(), g = ac.createGain();
       o.frequency.value = f * m * rnd(0.995, 1.005);
-      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d * ring * (0.7 + strength * 0.6));
-      o.connect(g); g.connect(out); o.start(t); o.stop(t + d * ring * 1.3 + 0.1);
-    }
-    if (heavy) {   // the weight of it: a short, low knock under the ring
-      const o = ac.createOscillator(), g = ac.createGain();
-      o.frequency.setValueAtTime(rnd(120, 170), t); o.frequency.exponentialRampToValueAtTime(rnd(60, 80), t + 0.16);
-      g.gain.setValueAtTime(0.9 * (0.5 + strength * 0.5), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-      o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.25);
+      g.gain.setValueAtTime(a, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d * (0.7 + strength * 0.6));
+      o.connect(g); g.connect(out); o.start(t); o.stop(t + d * 1.3 + 0.1);
     }
     const n = this.noiseSource(), bp = this.band(3500, 7000), g = ac.createGain();
     g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.02);
     n.connect(bp); bp.connect(g); g.connect(out); n.start(t, Math.random()); n.stop(t + 0.03);
+  }
+
+  /**
+   * An iron link striking iron: a hard, noisy impact, a dense cluster of clashing overtones that dies almost at once
+   * (the links damp each other), and a dull weight beneath. Frequency modulation gives the clang its metal.
+   */
+  clank(strength = 0.6, pan = 0, when = 0) {
+    if (!this.enabled) return;
+    this.clanks = (this.clanks || 0) + 1;   // (counted for --trace)
+    const ac = this.ensure(), t = ac.currentTime + when, s = Math.max(0.05, Math.min(1, strength));
+    const out = this.out(0.1 + 0.5 * Math.pow(s, 1.1), pan, 0.3);
+    const bus = ac.createWaveShaper(); bus.curve = this.gritCurve;
+    bus.connect(out);
+    const e = ac.createGain(); e.gain.value = 0.35; out.connect(e); e.connect(this.echoIn);
+    // the clang: two FM voices, inharmonic, bright at the strike and darkening fast
+    const base = rnd(260, 520);
+    for (const [ratio, mr, amp, dec] of [[1, 1.414, 0.55, 0.16], [rnd(2.3, 2.9), 1.73, 0.35, 0.09]]) {
+      const car = ac.createOscillator(), mod = ac.createOscillator(), mg = ac.createGain(), g = ac.createGain();
+      const f = base * ratio;
+      car.frequency.value = f; mod.frequency.value = f * mr;
+      mg.gain.setValueAtTime(f * (3.5 + 3 * s), t); mg.gain.exponentialRampToValueAtTime(f * 0.15, t + 0.07);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(amp, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + dec * (0.8 + s * 0.6));
+      mod.connect(mg); mg.connect(car.frequency); car.connect(g); g.connect(bus);
+      car.start(t); mod.start(t); car.stop(t + dec * 1.5 + 0.05); mod.stop(t + dec * 1.5 + 0.05);
+    }
+    // the strike: a short burst of metallic noise
+    const n = this.noiseSource(), f1 = this.band(1800, 7500), ng = ac.createGain();
+    ng.gain.setValueAtTime(0.9 * s, t); ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+    n.connect(f1); f1.connect(ng); ng.connect(bus); n.start(t, Math.random()); n.stop(t + 0.05);
+    // the weight: a dull, low knock
+    const o = ac.createOscillator(), og = ac.createGain();
+    o.frequency.setValueAtTime(rnd(95, 130), t); o.frequency.exponentialRampToValueAtTime(55, t + 0.08);
+    og.gain.setValueAtTime(0.8 * s, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    o.connect(og); og.connect(bus); o.start(t); o.stop(t + 0.13);
   }
 
   /** A chain rattling: near, or far off in another room. */
@@ -136,16 +168,18 @@ export class Sound {
     for (let k = 0; k < count; k++) this.clink(strength * rnd(0.5, 1) * (far ? 0.35 : 1), pan + rnd(-0.15, 0.15), far ? 0.9 : 0.45, Math.random() * spread, { heavy: true });
   }
 
-  /** A chain dragging along the floor; `level` 0..1, call every frame or on change. */
-  scrape(level) {
+  /** A chain dragging along the floor; `level` 0..1, call every frame or on change, `pan` where the chain is. */
+  scrape(level, pan = null) {
     if (!this.enabled && !this.loops.scrape) return;
     this.ensure();
     if (!this.loops.scrape) {
       const src = this.noiseSource(true), bp = this.band(500, 1300), g = this.ac.createGain(); g.gain.value = 0;   // a low, heavy drag
-      src.connect(bp); bp.connect(g); g.connect(this.out(1, 0.3, 0.4)); src.start();
-      this.loops.scrape = g;
+      const out = this.out(1, 0.3, 0.4);
+      src.connect(bp); bp.connect(g); g.connect(out); src.start();
+      this.loops.scrape = g; this.scrapePan = out.panner;
     }
-    this.loops.scrape.gain.setTargetAtTime(Math.min(0.25, level) * (this.enabled ? 1 : 0), this.ac.currentTime, 0.06);
+    if (pan !== null) this.scrapePan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), this.ac.currentTime, 0.1);
+    this.loops.scrape.gain.setTargetAtTime(Math.min(0.32, level) * (this.enabled ? 1 : 0), this.ac.currentTime, 0.06);
   }
 
   /** Low wind for the last spirit. `fast` cuts it dead instead of letting it die away. */

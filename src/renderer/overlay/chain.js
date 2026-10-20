@@ -230,7 +230,7 @@ export class Chain {
   sounds() {
     const snd = this.sound;
     if (!snd || this.view.alpha < 0.2) { this.events.length = 0; return; }
-    const now = performance.now(), dt = Math.min(0.1, (now - (this.lastSoundCheck || now)) / 1000);
+    const now = performance.now(), dt = Math.min(0.1, (now - (this.lastSoundCheck || now)) / 1000);   // (used by the drag below too)
     this.lastSoundCheck = now;
     this.clinkBudget = Math.min(MAX_CLINKS_PER_SECOND, this.clinkBudget + dt * MAX_CLINKS_PER_SECOND);
     const minTravel = this.P * MIN_TRAVEL;
@@ -248,8 +248,15 @@ export class Chain {
       this.lastClink = now; this.clinkBudget -= 1; played++;
     }
     this.events.length = 0;
-    // a scrape only for real dragging, not for a link settling on the floor
-    snd.scrape(this.slide > 6 ? Math.min(0.16, (this.slide - 6) * 0.003) : 0);
+    // dragged along the floor, a chain clanks link against link and grinds: both follow how fast it's sliding
+    const drag = Math.min(1, Math.max(0, (this.slide - 3) / 7));
+    snd.scrape(drag > 0 ? 0.06 + drag * 0.22 : 0, (this.X[this.count >> 1] / this.stage.W) * 2 - 1);
+    this.dragAcc = (this.dragAcc || 0) + drag * 7 * dt;   // up to seven clanks a second while it's hauled
+    while (this.dragAcc >= 1) {
+      this.dragAcc -= 1 + Math.random() * 0.3;
+      const i = 1 + Math.floor(Math.random() * (this.count - 1));
+      snd.clink(0.3 + Math.random() * 0.45 * drag, (this.X[i] / this.stage.W) * 2 - 1, 0.6, Math.random() * 0.05, { heavy: true });
+    }
   }
 
   /** The chain's extent on screen, for knowing when it has gone. */

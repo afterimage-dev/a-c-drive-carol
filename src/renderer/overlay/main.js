@@ -29,16 +29,19 @@ function softTexture() {
 
 let run = null;   // { kind, ctx, ac }
 
-// development: the leading spirit's speed, five times a second, in lines of 30 (--trace)
+// development: the leading spirit's speed@left edge, and the chain's clanks and scrape level, five times a second, in lines of 15 (--trace)
 let traced = [], traceT = 0;
+const flushTrace = () => { if (traced.length) carol.log(`speed ${traced.join(" ")}`); traced = []; };
 stage.app.ticker.add(() => {
-  if (!run?.ctx.settings.trace) return;
+  if (!run?.ctx.settings.trace) return flushTrace();   // (the end of a scene)
   traceT += stage.app.ticker.deltaMS;
   if (traceT < 200) return;
   traceT = 0;
   const lead = [...stage.puppets].at(-1);
-  if (lead) traced.push(Math.round(Math.hypot(lead.M.vx, lead.M.vy)));
-  if (traced.length >= 30) { carol.log(`speed ${traced.join(" ")}`); traced = []; }
+  const scrape = sound.loops?.scrape?.gain.value ?? 0;
+  if (lead) traced.push(`${Math.round(Math.hypot(lead.M.vx, lead.M.vy))}@${Math.round(lead.bounds().x)}:c${sound.clanks || 0}s${scrape.toFixed(2)}`);
+  sound.clanks = 0;
+  if (traced.length >= 15) flushTrace();
 });
 
 // development: report the frame rate while something is on screen

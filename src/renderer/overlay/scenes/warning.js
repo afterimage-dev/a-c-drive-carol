@@ -3,7 +3,7 @@
 
 import { Chain } from "../chain.js";
 import { intro } from "./intro.js";
-import { wait, el, clamp } from "../util.js";
+import { wait, until, el, clamp } from "../util.js";
 
 /** Dark towards the far corners, clear around (fx, fy): a light pool round his corner, the rest in shadow. */
 function cornerVignette(W, H, fx, fy) {
@@ -28,13 +28,19 @@ export async function warning(ctx) {
   const x = W - h * 0.55 - 36, y = floor - h * 0.62;
 
   const marl = stage.summon("marl", { home: [x / W, y / H], height: h / H, wander: [0.012, 0.006], flip: false, alpha: 0, pace: 0.45, k: 1.6, d: 2.4, heave: { period: 1.9, rest: 0.45 } });
-  marl.jump(x, y);
+  marl.jump(W + h * 1.8, y);   // off-screen to the right: a couple of heaves of chain heard before he's seen
 
-  // the rest of the screen darkens towards its other three corners; his corner stays as it was
+  // the rest of the screen darkens towards its other three corners as he hauls himself in; his corner stays as it was
   const vignette = new PIXI.Sprite(cornerVignette(W, H, x / W, y / H));
   vignette.width = W; vignette.height = H; vignette.alpha = 0;
   stage.layers.dim.addChild(vignette);
-  const vignetteOff = stage.add(() => { vignette.alpha = marl.s.alpha; });
+  const fromX = marl.M.x;
+  let come = 0, leaving = false;   // how far in he's come (never less if you drag him back out, until he leaves)
+  const vignetteOff = stage.add(() => {
+    const k = clamp((fromX - marl.M.x) / (fromX - x));
+    come = leaving ? Math.min(come, k) : Math.max(come, k);
+    vignette.alpha = marl.s.alpha * come * come * (3 - 2 * come);
+  });
 
   // a soft shadow behind him, so the phosphor reads even over a bright window
   const shade = new PIXI.Sprite(ctx.softTexture());
@@ -42,7 +48,7 @@ export async function warning(ctx) {
   stage.layers.dim.addChild(shade);
   const shadeOff = stage.add(() => { shade.alpha = 0.42 * marl.s.alpha; shade.position.set(marl.M.x - h * 0.05, marl.M.y + h * 0.02); });
   const exts = [...new Set(night.chain.biggest.map((f) => (f.ext ? "." + f.ext : ".?")))];
-  const chain = new Chain(stage, marl, { links: 30, floorY: floor, exts, sound });
+  const chain = new Chain(stage, marl, { links: 30, floorY: floor, exts, sound, walls: false, trail: 1 });   // the chain trails behind him
   ctx.hitTests.push((px, py) => {
     const b = marl.bounds();
     return (px > b.x + b.w * 0.15 && px < b.x + b.w * 0.85 && py > b.y && py < b.y + b.h * 0.8) || chain.hit(px, py) >= 0;
@@ -50,10 +56,16 @@ export async function warning(ctx) {
   ctx.onPointerDown((px, py) => { const i = chain.hit(px, py); if (i > 0) { chain.take(i); return true; } return false; });
   ctx.onPointerUp(() => chain.drop());
 
-  marl.fadeTo(1, 1.4);
-  sound.clink(0.6, 0.7, 0.6, 0, { heavy: true });
+  // heard before he's seen: the chain dragging somewhere off to the right, then he hauls himself in, heave by heave
   sound.music("marl", { level: 0.55 });   // quieter: your desktop isn't dimmed for a warning
-  await wait(1200, signal);
+  marl.fadeTo(1, 0.05);
+  marl.moveTo(x, y, 4, 2.6);   // a stiff pull: steady strides all the way in, not a slow creep at the end
+  await until((resolve) => {
+    let t = 0;
+    const off = stage.add((_t, dt) => { t += dt; if ((Math.abs(marl.M.x - x) < 10 && Math.hypot(marl.M.vx, marl.M.vy) < 25) || t > 12) { off(); resolve(); } });
+  }, signal);
+  marl.roam();
+  await wait(500, signal);
 
   // the stave's title, small, in his corner: where his first line will appear, gone before it does
   const title = el("div", "corner-title", `<span class="stave">Stave One</span><span class="name">Marlware's Ghost</span>`);
@@ -101,6 +113,7 @@ export async function warning(ctx) {
     // he drags the chain off-screen
     // until the whole chain has been dragged off the right edge
     chain.walls = false;
+    leaving = true;   // and the dark recedes with him
     marl.moveTo(W + h * 6, y + h * 0.05, 1.2, 2.2);
     await Promise.race([chain.gone((e) => e.minX > W + 20, 18000), wait(1e9, signal)]);
   } else {

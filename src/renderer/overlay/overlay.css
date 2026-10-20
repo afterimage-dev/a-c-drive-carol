@@ -94,8 +94,16 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
   transition: opacity 1s; pointer-events: none; text-wrap: balance; }
 .intro-page p { margin: 0; opacity: 0; transform: translateY(6px); filter: blur(3px); transition: opacity 1.2s, transform 1.4s, filter 1.2s; }
 .intro-page p.on { opacity: 1; transform: none; filter: none; }
-.intro-page p.first .cap { font-size: 2.1em; line-height: 0; vertical-align: -0.12em; margin-right: 2px; color: var(--marl); }
+.intro-page p.first .cap { font-size: 2.1em; line-height: 1; vertical-align: baseline; margin-right: 3px; color: var(--marl); }   /* sits on the line's baseline */
 .intro-page.gone { opacity: 0; }
+/* the title page */
+.title-page { position: absolute; left: 50%; top: 50%; translate: -50% -50%; width: min(1500px, 94vw); display: grid; justify-items: center; gap: 18px; text-align: center;
+  opacity: 0; transform: translateY(8px); transition: opacity 1.4s, transform 1.8s; pointer-events: none; }
+.title-page.on { opacity: 1; transform: none; }
+.title-page h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(44px, 5.2vw, 100px); line-height: 1; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  color: var(--marl); text-shadow: 0 0 34px rgba(143, 240, 238, .35), 0 3px 18px rgba(0, 0, 0, .8); }
+.title-page hr { width: min(420px, 50%); border: 0; border-top: 1px solid rgba(233, 230, 245, .35); margin: 4px 0; }
+.title-page p { margin: 0; font-family: var(--display); font-style: italic; font-size: clamp(22px, 2vw, 32px); color: #f2effa; text-shadow: 0 2px 12px rgba(0, 0, 0, .8); }
 .skip-intro { position: absolute; right: 24px; bottom: 64px; font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
   opacity: 0; transition: opacity .6s; }
 .skip-intro.on { opacity: 1; }
@@ -194,4 +202,5 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
   .card.v-you .w { transition: none; filter: none; transform: none; }
   .card.waits.ready .next { animation: none; }
   .intro-page p { transition: opacity .3s; transform: none; filter: none; }
+  .title-page { transition: opacity .3s; transform: none; }
 }
