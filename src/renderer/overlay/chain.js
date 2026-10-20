@@ -250,12 +250,12 @@ export class Chain {
     this.events.length = 0;
     // dragged along the floor, a chain clanks link against link and grinds: both follow how fast it's sliding
     const drag = Math.min(1, Math.max(0, (this.slide - 3) / 7));
-    snd.scrape(drag > 0 ? 0.06 + drag * 0.22 : 0, (this.X[this.count >> 1] / this.stage.W) * 2 - 1);
-    this.dragAcc = (this.dragAcc || 0) + drag * 7 * dt;   // up to seven clanks a second while it's hauled
+    snd.scrape(drag, (this.X[this.count >> 1] / this.stage.W) * 2 - 1);
+    this.dragAcc = (this.dragAcc || 0) + drag * 11 * dt;   // and up to eleven louder clanks a second over it
     while (this.dragAcc >= 1) {
-      this.dragAcc -= 1 + Math.random() * 0.3;
+      this.dragAcc -= 0.6 + Math.random() * 0.8;
       const i = 1 + Math.floor(Math.random() * (this.count - 1));
-      snd.clink(0.3 + Math.random() * 0.45 * drag, (this.X[i] / this.stage.W) * 2 - 1, 0.6, Math.random() * 0.05, { heavy: true });
+      snd.clink(0.25 + Math.random() * 0.5 * drag, (this.X[i] / this.stage.W) * 2 - 1, 0.6, Math.random() * 0.05, { heavy: true });
     }
   }
 

@@ -17,6 +17,48 @@ const THEMES = {
   present: { chords: [[43, 50, 55, 59, 62], [48, 55, 60, 64], [43, 50, 59, 62, 67], [50, 57, 62, 66]], dur: 4.6, wave: "sawtooth", wave2: "triangle", cutoff: 1700, gain: 0.3, attack: 1.2, sway: { rate: 1.35, depth: 0.32 } }
 };
 
+/**
+ * A chain hauled over a floor, as a seamless mono loop (peak 1): a dark grind, and on it a stream of small iron
+ * contacts, link on link and link on floor, coming in bunches as each link drags the next ones after it.
+ * Levelled by loudness and softly clipped, so one hard knock doesn't leave the rest faint.
+ */
+export function chainDrag(rate, seconds = 4, random = Math.random) {
+  const n = Math.round(rate * seconds), d = new Float32Array(n), TAU = Math.PI * 2;
+  // the grind: dark noise that swells and thins as the links catch and slip
+  let lp = 0, sw = 0.6, swTo = 0.6;
+  const a = 1 - Math.exp(-TAU * 500 / rate);
+  for (let i = 0; i < n; i++) {
+    if (i % 2048 === 0) swTo = Math.min(1, Math.max(0.25, swTo + (random() - 0.5) * 0.5));
+    sw += (swTo - sw) * 0.0008;
+    lp += (random() * 2 - 1 - lp) * a;
+    d[i] = lp * sw * 0.9;
+  }
+  // the contacts: a clipped ring of iron over a dull knock, a tick of noise at the strike
+  const len = Math.round(rate * 0.07), click = Math.round(rate * 0.0012);
+  const contact = (at, amp) => {
+    const start = Math.round(at * rate), f = 450 + random() * 1150, knock = 110 + random() * 110;
+    const parts = [[f, 1, 0.01 + random() * 0.012], [f * (1.5 + random() * 0.5), 0.6, 0.007 + random() * 0.008], [f * (2.6 + random() * 0.9), 0.35, 0.004 + random() * 0.005]];
+    const ph = parts.map(() => random() * TAU);
+    for (let s = 0; s < len; s++) {
+      const t = s / rate;
+      let v = 0.8 * Math.exp(-t / 0.014) * Math.sin(TAU * knock * t);
+      for (let p = 0; p < 3; p++) v += parts[p][1] * Math.exp(-t / parts[p][2]) * Math.sin(TAU * parts[p][0] * t + ph[p]);
+      if (s < click) v += (random() * 2 - 1) * (1 - s / click);
+      d[(start + s) % n] += v * amp;
+    }
+  };
+  for (let t = 0; t < seconds;) {
+    const k = 1 + Math.floor(random() * 4), big = Math.pow(random(), 2.2);
+    for (let j = 0, at = t; j < k; j++, at += 0.012 + random() * 0.03) contact(at, (0.2 + 0.8 * big) * (0.5 + random() * 0.5));
+    t += 0.04 + random() * 0.1;
+  }
+  let sum = 0;
+  for (let i = 0; i < n; i++) sum += d[i] * d[i];
+  const k = 0.3 / Math.sqrt(sum / n);
+  for (let i = 0; i < n; i++) d[i] = Math.tanh(d[i] * k);
+  return d;
+}
+
 export class Sound {
   constructor() {
     this.ac = null;
@@ -57,7 +99,18 @@ export class Sound {
     const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), nd = nb.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this.noise = nb;
+    setTimeout(() => this.dragBuffer(), 1500);   // a sixth of a second's work: done early, while nothing much is moving
     return ac;
+  }
+
+  /** The chain-drag loop, made once. */
+  dragBuffer() {
+    if (!this.dragBuf) {
+      const ac = this.ac;
+      this.dragBuf = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate);
+      this.dragBuf.copyToChannel(chainDrag(ac.sampleRate, 4), 0);
+    }
+    return this.dragBuf;
   }
 
   /** Development: how loud the output is right now (peak and RMS, 0..1), to check nothing is silent or clipping. */
@@ -136,7 +189,7 @@ export class Sound {
     if (!this.enabled) return;
     this.clanks = (this.clanks || 0) + 1;   // (counted for --trace)
     const ac = this.ensure(), t = ac.currentTime + when, s = Math.max(0.05, Math.min(1, strength));
-    const out = this.out(0.1 + 0.5 * Math.pow(s, 1.1), pan, 0.3);
+    const out = this.out(0.1 + 0.5 * Math.pow(s, 1.1), Math.max(-0.75, Math.min(0.75, pan)), 0.3);
     const bus = ac.createWaveShaper(); bus.curve = this.gritCurve;
     bus.connect(out);
     const e = ac.createGain(); e.gain.value = 0.35; out.connect(e); e.connect(this.echoIn);
@@ -168,18 +221,26 @@ export class Sound {
     for (let k = 0; k < count; k++) this.clink(strength * rnd(0.5, 1) * (far ? 0.35 : 1), pan + rnd(-0.15, 0.15), far ? 0.9 : 0.45, Math.random() * spread, { heavy: true });
   }
 
-  /** A chain dragging along the floor; `level` 0..1, call every frame or on change, `pan` where the chain is. */
+  /**
+   * A chain dragging along the floor: `level` 0..1 is how hard it's hauled (call every frame or on change), `pan`
+   * where the chain is. Harder, and the links come thicker and faster; it catches at once and grinds to a halt.
+   */
   scrape(level, pan = null) {
     if (!this.enabled && !this.loops.scrape) return;
-    this.ensure();
+    const ac = this.ensure(), t = ac.currentTime;
     if (!this.loops.scrape) {
-      const src = this.noiseSource(true), bp = this.band(500, 1300), g = this.ac.createGain(); g.gain.value = 0;   // a low, heavy drag
-      const out = this.out(1, 0.3, 0.4);
-      src.connect(bp); bp.connect(g); g.connect(out); src.start();
-      this.loops.scrape = g; this.scrapePan = out.panner;
+      const src = ac.createBufferSource(), g = ac.createGain(), out = this.out(1, 0.3, 0.35);
+      src.buffer = this.dragBuffer(); src.loop = true; g.gain.value = 0;
+      src.connect(g); g.connect(out); src.start(0, Math.random() * 4);
+      this.loops.scrape = g; this.scrapeSrc = src; this.scrapePan = out.panner; this.scrapeTo = 0;
     }
-    if (pan !== null) this.scrapePan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), this.ac.currentTime, 0.1);
-    this.loops.scrape.gain.setTargetAtTime(Math.min(0.32, level) * (this.enabled ? 1 : 0), this.ac.currentTime, 0.06);
+    const l = Math.max(0, Math.min(1, level)), to = l > 0 && this.enabled ? 0.07 + 0.2 * l : 0;
+    if (to !== this.scrapeTo) {
+      this.loops.scrape.gain.setTargetAtTime(to, t, to > this.scrapeTo ? 0.05 : 0.35);
+      this.scrapeSrc.playbackRate.setTargetAtTime(0.8 + 0.4 * l, t, 0.2);
+      this.scrapeTo = to;
+    }
+    if (pan !== null) this.scrapePan.pan.setTargetAtTime(Math.max(-0.75, Math.min(0.75, pan)), t, 0.1);   // never wholly in one ear
   }
 
   /** Low wind for the last spirit. `fast` cuts it dead instead of letting it die away. */
