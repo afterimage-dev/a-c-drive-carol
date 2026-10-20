@@ -22,6 +22,7 @@ test("Marlware's warning carries the real weight and length of the chain", (t) =
   const named = prepareNight(m, { account: "nicholas.tweedale" });
   assert.deepEqual(named.grave, { owner: "NICHOLAS'S C:", cause: "DIED OF ONE DISK IMAGE" });
   assert.equal(prepareNight(m, { account: "Administrator" }).grave.owner, "YOUR C:");
+  assert.equal(prepareNight(m, { account: "" }).grave.owner, "YOUR C:", "--anonymous passes no account name");
 });
 
 test("a repeat warning is shorter, and one after fleeing says so", (t) => {

@@ -277,7 +277,7 @@ export class Controller {
     this.manifest = applyMemory(m, this.settings);
     this.lastDrive = m.drive;
     if (mode === "real" && !this.settings.realNights) { this.settings.realNights = true; this.watchDownloads(); }
-    this.night = prepareNight(this.manifest, { again, fled: this.sched.fled, previousCount: this.settings.lastCount ?? null, account: os.userInfo().username });
+    this.night = prepareNight(this.manifest, { again, fled: this.sched.fled, previousCount: this.settings.lastCount ?? null, account: this.flags.anonymous ? "" : os.userInfo().username });
     this.settings.lastCount = this.manifest.files.length;
     const shown = new Map();
     for (const f of [...this.night.past, ...this.night.chain.biggest, ...this.night.present.groups.flatMap((g) => g.files)]) shown.set(f.id, f);

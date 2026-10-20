@@ -14,6 +14,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --demo           start a sample night at once  --scene=X    skip the warning and start the visit at stave X
 //   --autoplay       make default choices          --capture=F  save overlay pictures to F (--capture-at=2,5,9)
 //   --no-backdrop    don't photograph the desktop for the visit (it just darkens instead)
+//   --anonymous      carve YOUR C: on the gravestone instead of your account name (for recordings)
 //   --answer=X       with --autoplay, answer Marlware with X (here | notTonight | now)
 //   --omen=X         show one omen on the sample files (passing | cold | rattle | notification)
 //   --setup          open the settings window (with --capture, pictures are taken of it)
@@ -41,6 +42,7 @@ const flags = {
   capture: devAllowed ? value("capture") : null,
   captureAt: devAllowed ? value("capture-at") : null,
   noBackdrop: devAllowed && !!flag("no-backdrop"),
+  anonymous: devAllowed && !!flag("anonymous"),
   answer: devAllowed ? value("answer") : null,
   omen: devAllowed ? value("omen") : null,
   setup: !!flag("setup"),

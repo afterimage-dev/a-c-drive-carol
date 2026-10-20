@@ -1,0 +1,33 @@
+{
+  "_about": "The demo video's edit. 'cards' are drawn once by render-cards.js; 'segments' play in order. A clip is { take, in, out } (a file in video/takes, times from the start of the take as seconds or m:ss.s), optionally with fadeIn/fadeOut and a caption card over it (captionAt/captionUntil, seconds into the clip). A card segment is { card, duration }. 'target' is the length we're aiming for, and 'note' says what the clip should hold; build.js ignores both.",
+  "output": "a-c-drive-carol-demo.mp4",
+  "size": [1920, 1080],
+  "fps": 60,
+  "cards": {
+    "asked": { "line": "You asked for them now.", "fact": "left alone, they wait for a safe moment:\nnever mid-call, never mid-game", "accent": "#a8eef2" },
+    "past": { "line": "Every file remembers the night it arrived.", "fact": "your oldest downloads, and the sites they came from", "accent": "#ffb347" },
+    "present": { "line": "Not every file is the only one of itself.", "fact": "exact duplicates, found by hash", "accent": "#9dff9f" },
+    "yet": { "line": "The last spirit never speaks.", "fact": "when your drive fills, at the rate it's growing", "accent": "#a194de" },
+    "morning": { "line": "Morning. Nothing has moved. Yet.", "fact": "nothing moves until you say so", "accent": "#ffd9a0" },
+    "crypt": { "kind": "caption", "line": "Moved, never deleted.", "fact": "everything rests in the Crypt, and Resurrect puts it all back" },
+    "esc": { "kind": "caption", "line": "Esc ends it at once.", "fact": "and whatever you chose is thrown away" },
+    "end": { "kind": "end", "line": "A C-Drive Carol", "fact": ["recorded with the sample files; their sizes and dates are simulated", "github.com/afterimage-dev/a-c-drive-carol"], "accent": "#a8eef2" }
+  },
+  "segments": [
+    { "id": "open", "take": null, "in": null, "out": null, "fadeIn": 0.6, "target": 9, "note": "the veil, the title page, 'Jacob Marlware was dead, to begin with.'" },
+    { "id": "warning", "take": null, "in": null, "out": null, "target": 14, "note": "the chain heard, he hauls in, one or two of his lines, the chain dragged, Bring them now" },
+    { "card": "asked", "duration": 3.2 },
+    { "id": "bell", "take": null, "in": null, "out": null, "target": 6, "note": "the desktop dims and frosts; 'The bell has struck One. They come.'" },
+    { "card": "past", "duration": 3.2 },
+    { "id": "past", "take": null, "in": null, "out": null, "target": 14, "note": "'I am the Ghost of Downloads Past', the 2:14 a.m. invoice's card, an installer pleading, Lay to rest, the halo completing" },
+    { "card": "present", "duration": 3.2 },
+    { "id": "present", "take": null, "in": null, "out": null, "target": 12, "note": "'Have you never met my brothers?', a group arguing, This one is real, 'Impostors, begone!'" },
+    { "card": "yet", "duration": 3.2 },
+    { "id": "yet", "take": null, "in": null, "out": null, "target": 13, "note": "the candle finds him, the stone rises and is carved, the frost melted, the date struck out and carved later" },
+    { "card": "morning", "duration": 3.2 },
+    { "id": "morning", "take": null, "in": null, "out": null, "target": 10, "note": "the review, Wake up, the stone cracks, 'Git bless us, every one, and every zero.'" },
+    { "id": "proof", "take": null, "in": null, "out": null, "caption": "crypt", "target": 10, "note": "Open the Crypt: the files in Explorer; Resurrect everything; the files back in the sample folder" },
+    { "id": "escape", "take": null, "in": null, "out": null, "caption": "esc", "fadeOut": 0.4, "target": 5, "note": "a choice made in the Present, then Esc: the desktop, as it was" },
+    { "card": "end", "duration": 5 }
+  ]
+}

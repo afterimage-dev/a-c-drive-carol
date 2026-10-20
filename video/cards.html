@@ -1,0 +1,44 @@
+<!doctype html>
+<!-- The demo video's cards, drawn by render-cards.js in the app's own type. The card comes in the query string:
+     { kind: "card" | "caption" | "end", line, fact (a string or a list), accent }. -->
+<html lang="en">
+<meta charset="utf-8">
+<link rel="stylesheet" href="../src/renderer/fonts.css">
+<style>
+  :root {
+    --void: #07070b; --ink: #f2effa; --dim: #9a96b0; --accent: rgba(233, 230, 245, .35);
+    --display: "IM Fell English", Georgia, serif; --mono: "JetBrains Mono", Consolas, ui-monospace, monospace;
+  }
+  html, body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: transparent; -webkit-font-smoothing: antialiased; }
+  p { margin: 0; text-wrap: balance; }
+  /* between staves: the whole screen, dark, like the app's opening page */
+  .card { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 28px; text-align: center;
+    background: radial-gradient(ellipse at 50% 46%, #12111b 0%, var(--void) 68%); }
+  .line { max-width: 1400px; font-family: var(--display); font-size: 74px; line-height: 1.15; color: var(--ink); text-shadow: 0 0 30px rgba(0, 0, 0, .8); }
+  /* the spirit's own colour, glowing a little so it reads at a glance */
+  hr { width: 380px; height: 2px; border: 0; margin: 0; background: var(--accent); box-shadow: 0 0 14px 1px var(--accent); }
+  .fact { max-width: 1400px; font-family: var(--mono); font-size: 31px; line-height: 1.5; letter-spacing: .04em; color: #b3afc8; white-space: pre-line; }
+  /* over footage: a feathered dark plate low on the screen, like the app's stave titles */
+  .caption { position: absolute; left: 50%; bottom: 110px; translate: -50% 0; display: grid; gap: 10px; justify-items: center; text-align: center;
+    padding: 22px 50px 24px; border-radius: 22px; background: rgba(6, 6, 11, .74); box-shadow: 0 0 70px 40px rgba(6, 6, 11, .55); }
+  .caption .line { font-size: 54px; white-space: nowrap; }
+  .caption .fact { font-size: 25px; white-space: pre; }
+  /* the last card: the title as the app's title page sets it */
+  .end h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 104px; line-height: 1; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+    color: #a8eef2; text-shadow: 0 0 34px rgba(143, 240, 238, .35), 0 3px 18px rgba(0, 0, 0, .8); }
+  .end { gap: 22px; }
+</style>
+<body>
+<script>
+  const card = JSON.parse(new URLSearchParams(location.search).get("card"));
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  if (card.accent) document.documentElement.style.setProperty("--accent", card.accent);
+  const kind = card.kind || "card";
+  const box = el("div", kind === "caption" ? "caption" : kind === "end" ? "card end" : "card");
+  box.append(kind === "end" ? el("h1", null, card.line) : el("p", "line", card.line));
+  if (kind !== "caption") box.append(el("hr"));
+  for (const fact of [].concat(card.fact ?? [])) box.append(el("p", "fact", fact));
+  document.body.append(box);
+</script>
+</body>
+</html>
