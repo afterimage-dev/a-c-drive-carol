@@ -49,6 +49,34 @@ export function rattles(data, rate, { on = -38, off = -48, gap = 0.15, min = 0.3
   return out;
 }
 
+/**
+ * Where single strikes are in a chain recording: moments the sound jumps sharply (by `rise` dB over the last few
+ * hundredths of a second) to something loud, at least `apart` seconds after the last. Each comes with the gain that
+ * brings it to a common loudness, so a quiet strike and a hard one can be played as each other; strikes too faint to
+ * bring up without the hiss behind them are left out.
+ * @returns {{ at: number, gain: number }[]}
+ */
+export function strikes(data, rate, { rise = 9, floor = -36, apart = 0.06, frame = 0.01 } = {}) {
+  const w = Math.max(1, Math.round(rate * frame)), db = [];
+  for (let i = 0; i + w <= data.length; i += w) {
+    let sum = 0;
+    for (let j = i; j < i + w; j++) sum += data[j] * data[j];
+    db.push(10 * Math.log10(sum / w + 1e-12));
+  }
+  const out = [], body = Math.round(0.08 / frame);
+  let last = -Infinity;
+  for (let f = 3; f < db.length - body; f++) {
+    const before = Math.min(db[f - 1], db[f - 2], db[f - 3]);
+    if (db[f] < floor || db[f] - before < rise || (f - last) * frame < apart) continue;
+    let sum = 0;
+    for (let k = f; k < f + body; k++) sum += Math.pow(10, db[k] / 10);
+    const gain = Math.pow(10, (-20 - 10 * Math.log10(sum / body)) / 20);
+    last = f;
+    if (gain <= 4) out.push({ at: Math.max(0, f * frame - 0.004), gain });
+  }
+  return out;
+}
+
 export class Sound {
   constructor() {
     this.ac = null;
@@ -100,7 +128,7 @@ export class Sound {
     for (const [name, url] of Object.entries(SAMPLES)) {
       fetch(url).then((r) => r.arrayBuffer()).then((b) => this.ac.decodeAudioData(b)).then((buf) => {
         this.buffers[name] = buf;
-        if (name === "rattle") this.rattleParts = rattles(buf.getChannelData(0), buf.sampleRate);
+        if (name === "rattle") { this.rattleParts = rattles(buf.getChannelData(0), buf.sampleRate); this.strikes = strikes(buf.getChannelData(0), buf.sampleRate); }
       }).catch((e) => console.warn(`sound: couldn't load ${url}: ${e.message}`));
     }
   }
@@ -180,6 +208,7 @@ export class Sound {
   clank(strength = 0.6, pan = 0, when = 0) {
     if (!this.enabled) return;
     this.clanks = (this.clanks || 0) + 1;   // (counted for --trace)
+    if (this.buffers.rattle && this.strikes?.length) return this.strike(strength, pan, when);
     const ac = this.ensure(), t = ac.currentTime + when, s = Math.max(0.05, Math.min(1, strength));
     const out = this.out(0.1 + 0.5 * Math.pow(s, 1.1), Math.max(-0.75, Math.min(0.75, pan)), 0.3);
     const bus = ac.createWaveShaper(); bus.curve = this.gritCurve;
@@ -205,6 +234,22 @@ export class Sound {
     o.frequency.setValueAtTime(rnd(95, 130), t); o.frequency.exponentialRampToValueAtTime(55, t + 0.08);
     og.gain.setValueAtTime(0.8 * s, t); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
     o.connect(og); og.connect(bus); o.start(t); o.stop(t + 0.13);
+  }
+
+  /**
+   * A link striking, cut from the rattle recording: one strike from it, levelled, at its own pitch and colour, held
+   * longer the harder it hits (so a hard landing brings a little of the rattle after it).
+   */
+  strike(strength = 0.6, pan = 0, when = 0) {
+    const ac = this.ensure(), t = ac.currentTime + when, s = Math.max(0.05, Math.min(1, strength));
+    const hit = this.strikes[Math.floor(Math.random() * this.strikes.length)], rate = rnd(0.72, 1.12), len = (0.09 + 0.3 * s) / rate;
+    const src = ac.createBufferSource(), tone = ac.createBiquadFilter(), g = ac.createGain();
+    const out = this.out((0.2 + 0.8 * s) * hit.gain * 0.5, Math.max(-0.75, Math.min(0.75, pan)), 0.25);
+    src.buffer = this.buffers.rattle; src.playbackRate.value = rate;
+    tone.type = "lowpass"; tone.frequency.value = rnd(2500, 9000);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.003);
+    g.gain.setTargetAtTime(0, t + len * 0.45, len * 0.25);
+    src.connect(tone); tone.connect(g); g.connect(out); src.start(t, hit.at); src.stop(t + len * 1.6 + 0.05);
   }
 
   /** A chain rattling: near, or far off in another room. */
