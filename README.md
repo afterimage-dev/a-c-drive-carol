@@ -8,6 +8,10 @@ In this telling, the miser is you, and the hoard is your hard drive.
 
 Built for **Hackyard Yard #5 · Haunted**: *build something that creeps into something real, and actually works.*
 
+## Watch it
+
+https://github.com/user-attachments/assets/76383c6a-30de-4b8f-b142-c773f065c354
+
 ---
 
 ## The night
