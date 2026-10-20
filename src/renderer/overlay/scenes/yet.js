@@ -134,7 +134,8 @@ export async function yet(ctx) {
       const all = stone.cleared();
       if (all > 0.6 || t > (ctx.settings.autoplay ? 5 : 30)) {   // or, if you never come, the frost thaws by itself
         off();
-        if (all <= 0.6) { stone.thaw(); if (!named) sound.heartbeat(104); }
+        stone.thaw();   // what's left melts away by itself, so no outline of the frost stays behind
+        if (all <= 0.6 && !named) sound.heartbeat(104);
         resolve();
       }
     });

@@ -9,11 +9,12 @@ const PANEL = [266, 150], ANGLE = 0.125;   // the blank panel and its tilt (asse
 const LINES = [{ y: -57, size: 18, alpha: 1 }, { y: -30, size: 21, alpha: 1 }, { y: -6, size: 12, alpha: 1 }, { y: 16, size: 14, alpha: 1 }, { y: 37, size: 11, alpha: 0.85 }];
 const MAX_W = 150, MIN_FIT = 0.55;   // the panel is about 150 px across; long lines shrink to fit, down to 55%
 const FROST = { w: 220, h: 150, y: -10, k: 2 };   // the frost over the panel, in panel units (canvas at k x)
+const MELT = { cells: 2, radius: 42, rate: 0.6 };   // a thickness grid (panel units per cell); candle's melt radius (screen px); thickness per second
 
-/** A frosted pane over the inscription: dense in the middle, feathered at the edges, with ice crystals in it. */
+/** The look of the frost: an opaque, mottled crust with ice crystals in it. How thick it is lives in a grid. */
 function frostCanvas() {
   const c = document.createElement("canvas"); c.width = FROST.w * FROST.k; c.height = FROST.h * FROST.k;
-  const g = c.getContext("2d", { willReadFrequently: true }), w = c.width, h = c.height;   // read back to know how much is melted
+  const g = c.getContext("2d"), w = c.width, h = c.height;
   g.fillStyle = "rgba(214,230,242,1)"; g.fillRect(0, 0, w, h);
   for (let i = 0; i < 900; i++) {   // rime: a mottled, opaque crust, so nothing carved beneath shows through
     const v = 200 + Math.random() * 55;
@@ -29,12 +30,6 @@ function frostCanvas() {
       x = x2; y = y2; a += (Math.random() - 0.5) * 1.2;
     }
   }
-  g.globalCompositeOperation = "destination-in";   // feather it into the panel
-  g.save(); g.translate(w / 2, h / 2); g.scale(1, h / w);
-  const e = g.createRadialGradient(0, 0, w * 0.3, 0, 0, w * 0.52);
-  e.addColorStop(0, "rgba(0,0,0,1)"); e.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = e; g.fillRect(-w / 2, -w / 2, w, w); g.restore();
-  g.globalCompositeOperation = "source-over";
   return c;
 }
 
@@ -150,24 +145,45 @@ export class Stone {
     await this.carveLine(i, text, { speed: 4 });
   }
 
-  /** Frost over the inscription. Your candle melts it where it lingers; `read()` reports how much is clear. */
+  /** Frost over the inscription. Your candle melts it where it lingers; `cleared()` reports how much is clear. */
   frost() {
-    const c = frostCanvas(), tex = PIXI.Texture.from(c);
+    const gw = FROST.w / MELT.cells, gh = FROST.h / MELT.cells;
+    const thick = new Float32Array(gw * gh);
+    for (let y = 0; y < gh; y++) for (let x = 0; x < gw; x++) {   // thickest in the middle, feathered into the panel at the edges
+      const dx = (x + 0.5) / gw - 0.5, dy = ((y + 0.5) / gh - 0.5) * (FROST.h / FROST.w), r = Math.hypot(dx, dy);
+      thick[y * gw + x] = clamp(1 - (r - 0.3) / 0.22);
+    }
+    const pattern = frostCanvas();
+    const out = document.createElement("canvas"); out.width = pattern.width; out.height = pattern.height;
+    const mask = document.createElement("canvas"); mask.width = gw; mask.height = gh;
+    const tex = PIXI.Texture.from(out);
     const s = new PIXI.Sprite(tex); s.anchor.set(0.5); s.width = FROST.w; s.height = FROST.h; s.y = FROST.y;
     this.carve.addChild(s);
-    this.frosted = { c, g: c.getContext("2d"), tex, s, thaw: 0, base: {} };
-    for (const i of [0, 1, 2, 3, 4, null]) this.frosted.base[i] = this.frostIn(i);   // how frosted each line starts
+    this.frosted = { thick, start: Float32Array.from(thick), gw, gh, pattern, out, og: out.getContext("2d"), mask, mg: mask.getContext("2d"),
+      img: mask.getContext("2d").createImageData(gw, gh), tex, s, thaw: 0, dirty: true };
+    this.paintFrost();
   }
 
-  /** The total frost over line `i` (or the whole inscription), from the canvas. */
-  frostIn(i) {
-    const F = this.frosted, k = FROST.k;
+  /** Draw the crust where it's still thick. */
+  paintFrost() {
+    const F = this.frosted, d = F.img.data;
+    for (let i = 0; i < F.thick.length; i++) { d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 255; d[i * 4 + 3] = Math.round(F.thick[i] * 255); }
+    F.mg.putImageData(F.img, 0, 0);
+    F.og.globalCompositeOperation = "copy"; F.og.drawImage(F.pattern, 0, 0);
+    F.og.globalCompositeOperation = "destination-in"; F.og.imageSmoothingEnabled = true; F.og.drawImage(F.mask, 0, 0, F.out.width, F.out.height);
+    F.og.globalCompositeOperation = "source-over";
+    F.tex.baseTexture.update();
+    F.dirty = false;
+  }
+
+  /** Total frost over line `i` (or the whole inscription), from the grid; `start` for how much there was at first. */
+  frostIn(i, grid = this.frosted.thick) {
+    const F = this.frosted, c = MELT.cells;
     const top = i == null ? LINES[0].y - 12 : LINES[i].y - LINES[i].size * 0.55, bottom = i == null ? LINES[3].y + 10 : LINES[i].y + LINES[i].size * 0.55;
-    const y0 = Math.round((top - FROST.y + FROST.h / 2) * k), y1 = Math.round((bottom - FROST.y + FROST.h / 2) * k);
-    const x0 = Math.round((FROST.w / 2 - 70) * k), x1 = Math.round((FROST.w / 2 + 70) * k);
-    const data = F.g.getImageData(x0, y0, x1 - x0, Math.max(1, y1 - y0)).data;
+    const y0 = Math.max(0, Math.floor((top - FROST.y + FROST.h / 2) / c)), y1 = Math.min(F.gh, Math.ceil((bottom - FROST.y + FROST.h / 2) / c));
+    const x0 = Math.floor((FROST.w / 2 - 70) / c), x1 = Math.ceil((FROST.w / 2 + 70) / c);
     let sum = 0;
-    for (let p = 3; p < data.length; p += 16) sum += data[p];
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) sum += grid[y * F.gw + x];
     return sum;
   }
 
@@ -175,7 +191,7 @@ export class Stone {
   cleared(i) {
     const F = this.frosted;
     if (!F) return 1;
-    const base = F.base[i ?? null] || 1;
+    const base = this.frostIn(i ?? null, F.start) || 1;
     return clamp(1 - (this.frostIn(i ?? null) / base) * (1 - F.thaw));
   }
 
@@ -269,19 +285,23 @@ export class Stone {
     if (F) {   // your candle melts the frost where it lingers
       if (F.thawing) { F.thaw = Math.min(1, F.thaw + dt * 0.5); F.s.alpha = 1 - F.thaw; }
       // in the dark the frost is lit only by your candle, like the stone
-      const c = this.carve.toGlobal(new PIXI.Point(0, FROST.y)), near = this.fall ? clamp(1 - (Math.hypot(ptr.x - c.x, ptr.y - c.y) - 60) / 340) : 1;
-      const v = Math.round(34 + 221 * (ptr.seen || !this.fall ? near : 0));
-      F.s.tint = (v << 16) | (Math.min(255, v + 6) << 8) | Math.min(255, v + 12);
+      const fc = this.carve.toGlobal(new PIXI.Point(0, FROST.y)), near = this.fall ? clamp(1 - (Math.hypot(ptr.x - fc.x, ptr.y - fc.y) - 60) / 340) : 1;
+      const fv = Math.round(34 + 221 * (ptr.seen || !this.fall ? near : 0));
+      F.s.tint = (fv << 16) | (Math.min(255, fv + 6) << 8) | Math.min(255, fv + 12);
       const l = this.carve.toLocal(new PIXI.Point(ptr.x, ptr.y));
-      const r = 80 / this.scale;
-      if (ptr.seen && Math.abs(l.x) < FROST.w / 2 + r && Math.abs(l.y - FROST.y) < FROST.h / 2 + r) {
-        const k = FROST.k, x = (l.x + FROST.w / 2) * k, y = (l.y - FROST.y + FROST.h / 2) * k;
-        const gr = F.g.createRadialGradient(x, y, 0, x, y, r * k);
-        gr.addColorStop(0, `rgba(0,0,0,${Math.min(1, dt * 2.2)})`); gr.addColorStop(0.6, `rgba(0,0,0,${Math.min(1, dt * 1.2)})`); gr.addColorStop(1, "rgba(0,0,0,0)");
-        F.g.globalCompositeOperation = "destination-out"; F.g.fillStyle = gr; F.g.fillRect(x - r * k, y - r * k, r * 2 * k, r * 2 * k);
-        F.g.globalCompositeOperation = "source-over";
-        F.tex.baseTexture.update();
+      const r = MELT.radius / this.scale, c = MELT.cells;
+      if (ptr.seen && !F.thawing && Math.abs(l.x) < FROST.w / 2 + r && Math.abs(l.y - FROST.y) < FROST.h / 2 + r) {
+        const cx = (l.x + FROST.w / 2) / c, cy = (l.y - FROST.y + FROST.h / 2) / c, rc = r / c;
+        for (let y = Math.max(0, Math.floor(cy - rc)); y < Math.min(F.gh, Math.ceil(cy + rc)); y++) {
+          for (let x = Math.max(0, Math.floor(cx - rc)); x < Math.min(F.gw, Math.ceil(cx + rc)); x++) {
+            const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / rc;
+            if (d >= 1) continue;
+            const i = y * F.gw + x, v = F.thick[i];
+            if (v > 0) { F.thick[i] = Math.max(0, v - MELT.rate * dt * (1 - d * d)); F.dirty = true; }
+          }
+        }
       }
+      if (F.dirty) this.paintFrost();
     }
     // the carving takes light from your candle like the stone does: dark letters with a faint edge of light when your
     // flame is far, crisp as it comes close
