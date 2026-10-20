@@ -34,6 +34,8 @@ test("app:// serves only the app's own folders", () => {
   const root = path.resolve("/app");
   assert.equal(resolveAppUrl("app://carol/src/renderer/overlay/index.html", root), path.join(root, "src", "renderer", "overlay", "index.html"));
   assert.equal(resolveAppUrl("app://carol/assets/sprites/stone.webp", root), path.join(root, "assets", "sprites", "stone.webp"));
+  assert.equal(resolveAppUrl("app://carol/assets/sounds/chain-drag.mp3", root), path.join(root, "assets", "sounds", "chain-drag.mp3"));
+  assert.equal(resolveAppUrl("app://carol/assets/originals/x.png", root), null);
   assert.equal(resolveAppUrl("app://carol/src/main/controller.js", root), null);
   assert.equal(resolveAppUrl("app://carol/src/renderer/../../package.json", root), null);
   assert.equal(resolveAppUrl("app://carol/%2e%2e/%2e%2e/Windows/win.ini", root), null);

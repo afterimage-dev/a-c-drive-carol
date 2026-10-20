@@ -1,5 +1,7 @@
-// Every sound is synthesised here: no samples, nothing to license. Quiet by default, and silent if sound is off.
-// Recipes follow trailer/soundtrack.py (bell, clinks, wind, grind, birdsong) so the app and the trailer match.
+// Every sound is made here. Almost all are synthesised; the chain dragging and rattling are two recordings
+// (assets/sounds, see the README's credits), varied in pitch and colour each time so they never repeat exactly.
+// Quiet by default, and silent if sound is off. Recipes follow trailer/soundtrack.py (bell, clinks, wind, grind,
+// birdsong) so the app and the trailer match.
 
 const rnd = (a, b) => a + Math.random() * (b - a);
 const hz = (midi) => 440 * Math.pow(2, (midi - 69) / 12);
@@ -17,46 +19,34 @@ const THEMES = {
   present: { chords: [[43, 50, 55, 59, 62], [48, 55, 60, 64], [43, 50, 59, 62, 67], [50, 57, 62, 66]], dur: 4.6, wave: "sawtooth", wave2: "triangle", cutoff: 1700, gain: 0.3, attack: 1.2, sway: { rate: 1.35, depth: 0.32 } }
 };
 
+// The recordings: where they are, and how loud to play them (their own levels differ a lot)
+const SAMPLES = { drag: "/assets/sounds/chain-drag.mp3", rattle: "/assets/sounds/chain-rattle.mp3" };
+const DRAG_GAIN = 1.5, RATTLE_GAIN = 0.55;
+
 /**
- * A chain hauled over a floor, as a seamless mono loop (peak 1): a dark grind, and on it a stream of small iron
- * contacts, link on link and link on floor, coming in bunches as each link drags the next ones after it.
- * Levelled by loudness and softly clipped, so one hard knock doesn't leave the rest faint.
+ * Where the separate rattles are in a recording of several, as [start, end] seconds: each one is loud for a while,
+ * then quiet for at least `gap` seconds. A little lead-in and tail is kept on each so nothing starts or ends abruptly.
  */
-export function chainDrag(rate, seconds = 4, random = Math.random) {
-  const n = Math.round(rate * seconds), d = new Float32Array(n), TAU = Math.PI * 2;
-  // the grind: dark noise that swells and thins as the links catch and slip
-  let lp = 0, sw = 0.6, swTo = 0.6;
-  const a = 1 - Math.exp(-TAU * 500 / rate);
-  for (let i = 0; i < n; i++) {
-    if (i % 2048 === 0) swTo = Math.min(1, Math.max(0.25, swTo + (random() - 0.5) * 0.5));
-    sw += (swTo - sw) * 0.0008;
-    lp += (random() * 2 - 1 - lp) * a;
-    d[i] = lp * sw * 0.9;
+export function rattles(data, rate, { on = -38, off = -48, gap = 0.15, min = 0.35, max = 3, frame = 0.02 } = {}) {
+  const w = Math.max(1, Math.round(rate * frame)), db = [];
+  for (let i = 0; i + w <= data.length; i += w) {
+    let sum = 0;
+    for (let j = i; j < i + w; j++) sum += data[j] * data[j];
+    db.push(10 * Math.log10(sum / w + 1e-12));
   }
-  // the contacts: a clipped ring of iron over a dull knock, a tick of noise at the strike
-  const len = Math.round(rate * 0.07), click = Math.round(rate * 0.0012);
-  const contact = (at, amp) => {
-    const start = Math.round(at * rate), f = 450 + random() * 1150, knock = 110 + random() * 110;
-    const parts = [[f, 1, 0.01 + random() * 0.012], [f * (1.5 + random() * 0.5), 0.6, 0.007 + random() * 0.008], [f * (2.6 + random() * 0.9), 0.35, 0.004 + random() * 0.005]];
-    const ph = parts.map(() => random() * TAU);
-    for (let s = 0; s < len; s++) {
-      const t = s / rate;
-      let v = 0.8 * Math.exp(-t / 0.014) * Math.sin(TAU * knock * t);
-      for (let p = 0; p < 3; p++) v += parts[p][1] * Math.exp(-t / parts[p][2]) * Math.sin(TAU * parts[p][0] * t + ph[p]);
-      if (s < click) v += (random() * 2 - 1) * (1 - s / click);
-      d[(start + s) % n] += v * amp;
+  const out = [], quiet = Math.round(gap / frame);
+  let start = -1, still = 0;
+  for (let f = 0; f <= db.length; f++) {
+    const v = f < db.length ? db[f] : -Infinity;
+    if (start < 0) { if (v > on) { start = f; still = 0; } continue; }
+    still = v < off ? still + 1 : 0;
+    if (still >= quiet || f === db.length) {
+      const a = Math.max(0, start * frame - 0.03), b = Math.min(data.length / rate, (f - still + 1) * frame + 0.12);
+      if (b - a >= min) out.push([a, Math.min(b, a + max)]);
+      start = -1;
     }
-  };
-  for (let t = 0; t < seconds;) {
-    const k = 1 + Math.floor(random() * 4), big = Math.pow(random(), 2.2);
-    for (let j = 0, at = t; j < k; j++, at += 0.012 + random() * 0.03) contact(at, (0.2 + 0.8 * big) * (0.5 + random() * 0.5));
-    t += 0.04 + random() * 0.1;
   }
-  let sum = 0;
-  for (let i = 0; i < n; i++) sum += d[i] * d[i];
-  const k = 0.3 / Math.sqrt(sum / n);
-  for (let i = 0; i < n; i++) d[i] = Math.tanh(d[i] * k);
-  return d;
+  return out;
 }
 
 export class Sound {
@@ -65,6 +55,7 @@ export class Sound {
     this.enabled = true;
     this.volume = 0.5;
     this.loops = {};
+    this.buffers = {};
   }
 
   configure({ sound, volume }) {
@@ -99,18 +90,19 @@ export class Sound {
     const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate), nd = nb.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     this.noise = nb;
-    setTimeout(() => this.dragBuffer(), 1500);   // a sixth of a second's work: done early, while nothing much is moving
+    this.load();
     return ac;
   }
 
-  /** The chain-drag loop, made once. */
-  dragBuffer() {
-    if (!this.dragBuf) {
-      const ac = this.ac;
-      this.dragBuf = ac.createBuffer(1, ac.sampleRate * 4, ac.sampleRate);
-      this.dragBuf.copyToChannel(chainDrag(ac.sampleRate, 4), 0);
+  /** Fetch and decode the recordings, once. Until they're in (or if they never are), those sounds are synthesised. */
+  load() {
+    this.buffers = {};
+    for (const [name, url] of Object.entries(SAMPLES)) {
+      fetch(url).then((r) => r.arrayBuffer()).then((b) => this.ac.decodeAudioData(b)).then((buf) => {
+        this.buffers[name] = buf;
+        if (name === "rattle") this.rattleParts = rattles(buf.getChannelData(0), buf.sampleRate);
+      }).catch((e) => console.warn(`sound: couldn't load ${url}: ${e.message}`));
     }
-    return this.dragBuf;
   }
 
   /** Development: how loud the output is right now (peak and RMS, 0..1), to check nothing is silent or clipping. */
@@ -218,29 +210,59 @@ export class Sound {
   /** A chain rattling: near, or far off in another room. */
   rattle({ count = 7, spread = 1.1, strength = 0.6, pan = 0.4, far = false } = {}) {
     if (!this.enabled) return;
+    const ac = this.ensure(), parts = this.rattleParts;
+    if (this.buffers.rattle && parts?.length) {
+      // one of the recorded rattles (two for a long one), each at its own pitch; far off, it's muffled and echoes
+      for (let k = 0, n = count > 7 ? 2 : 1; k < n; k++) {
+        const [a, b] = parts[Math.floor(Math.random() * parts.length)], rate = rnd(0.8, 1.12), dur = (b - a) / rate;
+        const t = ac.currentTime + 0.01 + k * spread * 0.45;
+        const src = ac.createBufferSource(), tone = ac.createBiquadFilter(), g = ac.createGain();
+        const out = this.out((far ? 0.4 : 1) * (0.4 + strength) * RATTLE_GAIN, Math.max(-0.8, Math.min(0.8, pan + rnd(-0.15, 0.15))), far ? 0.9 : 0.3);
+        src.buffer = this.buffers.rattle; src.playbackRate.value = rate;
+        tone.type = "lowpass"; tone.frequency.value = far ? 1300 : rnd(3500, 9000);
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + 0.02);
+        g.gain.setValueAtTime(1, t + Math.max(0.03, dur - 0.15)); g.gain.linearRampToValueAtTime(0, t + dur);
+        src.connect(tone); tone.connect(g); g.connect(out); src.start(t, a); src.stop(t + dur + 0.05);
+      }
+      return;
+    }
     for (let k = 0; k < count; k++) this.clink(strength * rnd(0.5, 1) * (far ? 0.35 : 1), pan + rnd(-0.15, 0.15), far ? 0.9 : 0.45, Math.random() * spread, { heavy: true });
   }
 
   /**
    * A chain dragging along the floor: `level` 0..1 is how hard it's hauled (call every frame or on change), `pan`
-   * where the chain is. Harder, and the links come thicker and faster; it catches at once and grinds to a halt.
+   * where the chain is. Each haul is the recording once more at its own pitch, start and colour, its loudness
+   * following the effort; it fades as the chain stops, and a long haul runs on into another.
    */
   scrape(level, pan = null) {
-    if (!this.enabled && !this.loops.scrape) return;
-    const ac = this.ensure(), t = ac.currentTime;
-    if (!this.loops.scrape) {
-      const src = ac.createBufferSource(), g = ac.createGain(), out = this.out(1, 0.3, 0.35);
-      src.buffer = this.dragBuffer(); src.loop = true; g.gain.value = 0;
-      src.connect(g); g.connect(out); src.start(0, Math.random() * 4);
-      this.loops.scrape = g; this.scrapeSrc = src; this.scrapePan = out.panner; this.scrapeTo = 0;
-    }
-    const l = Math.max(0, Math.min(1, level)), to = l > 0 && this.enabled ? 0.07 + 0.2 * l : 0;
-    if (to !== this.scrapeTo) {
-      this.loops.scrape.gain.setTargetAtTime(to, t, to > this.scrapeTo ? 0.05 : 0.35);
-      this.scrapeSrc.playbackRate.setTargetAtTime(0.8 + 0.4 * l, t, 0.2);
-      this.scrapeTo = to;
-    }
-    if (pan !== null) this.scrapePan.pan.setTargetAtTime(Math.max(-0.75, Math.min(0.75, pan)), t, 0.1);   // never wholly in one ear
+    if (!this.ac && !(level > 0)) return;
+    const ac = this.ensure(), t = ac.currentTime, l = Math.max(0, Math.min(1, level || 0)), v = this.drag;
+    if (pan !== null) this.dragPan = Math.max(-0.75, Math.min(0.75, pan));   // never wholly in one ear
+    const hauling = l > 0.02 && this.enabled && this.buffers.drag;
+    if (v && (!hauling || t > v.until)) { this.release(v); this.drag = null; }
+    if (!hauling) return;
+    if (!this.drag) this.drag = this.dragVoice();
+    this.drag.g.gain.setTargetAtTime((0.35 + 0.65 * l) * DRAG_GAIN, t, 0.04);
+    this.drag.out.panner.pan.setTargetAtTime(this.dragPan ?? 0.3, t, 0.1);
+  }
+
+  /** One drag: the recording from a little way in, slower (heavier) or faster, darker or brighter. */
+  dragVoice() {
+    const ac = this.ac, t = ac.currentTime, buf = this.buffers.drag;
+    const src = ac.createBufferSource(), tone = ac.createBiquadFilter(), g = ac.createGain(), out = this.out(1, this.dragPan ?? 0.3, 0.15);
+    const rate = rnd(0.68, 1.04), from = rnd(0.04, 0.2);
+    src.buffer = buf; src.playbackRate.value = rate;
+    tone.type = "lowpass"; tone.frequency.value = rnd(1800, 7000); tone.Q.value = rnd(0.5, 2.2);
+    g.gain.value = 0;
+    src.connect(tone); tone.connect(g); g.connect(out);
+    src.start(t, from);
+    return { src, g, out, until: t + Math.max(0.3, (Math.min(buf.duration, 1.15) - from) / rate * 0.85) };
+  }
+
+  release(v) {
+    const t = this.ac.currentTime;
+    v.g.gain.cancelScheduledValues(t); v.g.gain.setTargetAtTime(0, t, 0.25);
+    v.src.stop(t + 1.5);
   }
 
   /** Low wind for the last spirit. `fast` cuts it dead instead of letting it die away. */

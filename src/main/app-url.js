@@ -6,7 +6,7 @@ import { isInside } from "./places.js";
 export const ORIGIN = "app://carol";
 
 /** Folders app://carol/ may serve from, relative to the app's root. Nothing else is reachable. */
-export const SERVED = ["src/renderer", "core", "assets/sprites", "node_modules/pixi.js/dist", "node_modules/@pixi/unsafe-eval/dist", "node_modules/@fontsource"];
+export const SERVED = ["src/renderer", "core", "assets/sprites", "assets/sounds", "node_modules/pixi.js/dist", "node_modules/@pixi/unsafe-eval/dist", "node_modules/@fontsource"];
 
 /** Schemes a window may request. Everything else (http, https, ws, ftp...) is cancelled. */
 const ALLOWED = /^(app|file|data|blob|devtools|chrome-extension):/i;

@@ -115,8 +115,9 @@ node core/manifest.js my-manifest.json
 - **Charles Dickens**, *A Christmas Carol* (1843), which is in the public domain. Lines borrowed from it are used lovingly and sparingly.
 - **Typefaces**, all under the SIL Open Font License: IM Fell English (Igino Marini), Cormorant Garamond, Abril Fatface, Cinzel, Old Standard TT (Alexey Kryukov), JetBrains Mono, IBM Plex Mono and Atkinson Hyperlegible.
 - **Animation**: [PixiJS](https://pixijs.com) (MIT).
+- **Chain sounds**: the drag is *Steel chain dragged (shower reverb)* by freesound_community (Pixabay #106252) and the rattles are *Scary chain noises* by alex_jauk (Pixabay #256451), both under the [Pixabay Content License](https://pixabay.com/service/license-summary/). Every other sound is synthesised in code.
 - **Character art**: generated with an AI image model, then cut out and animated in code.
 
 ## License
 
-MIT
+MIT, except the two chain recordings in `assets/sounds/`, which are under the Pixabay Content License (see Credits).

@@ -54,6 +54,7 @@
       "assets/sprites/edge.webp",
       "assets/sprites/padlock.webp",
       "assets/sprites/stone.webp",
+      "assets/sounds/*.mp3",
       "assets/icon.png",
       "assets/tray.png",
       "package.json"

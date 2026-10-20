@@ -38,7 +38,7 @@ stage.app.ticker.add(() => {
   if (traceT < 200) return;
   traceT = 0;
   const lead = [...stage.puppets].at(-1);
-  const scrape = sound.loops?.scrape?.gain.value ?? 0;
+  const scrape = sound.drag?.g.gain.value ?? 0;
   if (lead) traced.push(`${Math.round(Math.hypot(lead.M.vx, lead.M.vy))}@${Math.round(lead.bounds().x)}:c${sound.clanks || 0}s${scrape.toFixed(2)}`);
   sound.clanks = 0;
   if (traced.length >= 15) flushTrace();
