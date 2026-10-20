@@ -117,7 +117,7 @@ export class Controller {
   }
 
   rendererSettings() {
-    return { sound: this.settings.sound, volume: this.settings.volume, glow: this.settings.glow, dev: !!this.flags.dev, autoplay: !!this.flags.autoplay, autoAnswer: this.flags.answer, fling: !!this.flags.fling, trace: !!this.flags.trace, startAt: this.flags.scene || null, fast: !!this.flags.fast };
+    return { sound: this.settings.sound, volume: this.settings.volume, glow: this.settings.glow, dev: !!this.flags.dev, autoplay: !!this.flags.autoplay, autoAnswer: this.flags.answer, fling: this.flags.fling, trace: !!this.flags.trace, startAt: this.flags.scene || null, fast: !!this.flags.fast };
   }
 
   // ---------- the scheduler ----------

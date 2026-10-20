@@ -20,7 +20,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 //   --link           leave the morning-after chain link out (with --capture, pictures are taken of it)
 //   --wisp=PATH      pretend PATH (in --roots) was banished 30 days ago, so its wisp returns
 //   --profile=DIR    keep settings in DIR instead of the real profile (for test runs)
-//   --fling          in the warning, whirl the chain round his hand and let go (to check it always falls)
+//   --fling[=stretch] in the warning, whirl the chain round his hand and let go (to check it always falls), or
+//                    pull a far link well past its reach, hold it, and let go (to check it drops, not slingshots)
 //   --music[=past]   play each spirit's theme in turn, or from the one named (Next / Stop in the corner)
 //   --trace          log the leading spirit's speed and position, and the chain's clanks and scrape, five times a second
 //   --esc-at=N       press Esc N seconds into a visit (to check that nothing is applied)
@@ -44,7 +45,7 @@ const flags = {
   omen: devAllowed ? value("omen") : null,
   setup: !!flag("setup"),
   link: devAllowed && !!flag("link"),
-  fling: devAllowed && !!flag("fling"),
+  fling: devAllowed && flag("fling") ? value("fling") || "whirl" : null,
   music: devAllowed && flag("music") ? (value("music") || true) : false,
   trace: devAllowed && !!flag("trace"),
   wisp: devAllowed ? value("wisp") : null,

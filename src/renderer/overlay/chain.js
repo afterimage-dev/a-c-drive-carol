@@ -6,6 +6,9 @@ const DT = 1 / 480, ITER = 8;
 // Sound: a link only clinks again once it has really moved away from where it last clinked (MIN_TRAVEL link
 // pitches, measured as distance, so jitter never adds up), and the whole chain is capped at a few clinks a second.
 const MIN_TRAVEL = 1.5, MAX_CLINKS_PER_SECOND = 4;
+// Held, a link reaches no further than the chain allows (a little short of taut, so it never stretches); let go,
+// no part of it moves faster than this many of his heights a second: it's iron, it drops.
+const REACH = 0.98, LET_GO_SPEED = 1;
 const HAND = [298, 485];   // his chain hand, in the body sprite's pixels (assets/landmarks.json)
 const FILE = { w: 40, h: 50, pad: 9, scale: 3 };
 
@@ -151,7 +154,10 @@ export class Chain {
     }
     const h = this.hand();
     PX[0] = X[0]; PY[0] = Y[0]; X[0] = h.x; Y[0] = h.y;
-    if (this.grab.i > 0) { const p = this.stage.ptr; PX[this.grab.i] = X[this.grab.i]; PY[this.grab.i] = Y[this.grab.i]; X[this.grab.i] = p.x; Y[this.grab.i] = p.y; }
+    if (this.grab.i > 0) {
+      const p = this.stage.ptr, g = this.grab.i, dx = p.x - h.x, dy = p.y - h.y, d = Math.hypot(dx, dy), k = d > this.grab.len * REACH ? this.grab.len * REACH / d : 1;
+      PX[g] = X[g]; PY[g] = Y[g]; X[g] = h.x + dx * k; Y[g] = h.y + dy * k;
+    }
     const minAdj = P * 0.55, minSkip = 2 * P * Math.cos((120 * Math.PI / 180) / 2);
     for (let it = 0; it < ITER; it++) {
       if (it & 1) { for (let i = N - 1; i >= 0; i--) this.solveMax(i, i + 1, P); }
@@ -204,10 +210,10 @@ export class Chain {
     this.snapMax = 0; this.slide = 0;
     for (let s = 0; s < steps; s++) this.step(DT, false);
     this.slide /= Math.max(1, steps);
-    // a taut chain tugs him along when you pull it
+    // a taut chain tugs him along when you pull it further than it reaches
     if (this.grab.i > 0) {
-      const h = this.hand(), i = this.grab.i, dx = this.X[i] - h.x, dy = this.Y[i] - h.y, d = Math.hypot(dx, dy);
-      if (d > this.grab.len) { const f = (d - this.grab.len) * 26; this.puppet.M.vx += dx / d * f * dt; this.puppet.M.vy += dy / d * f * dt; }   // he's heavy to tug
+      const h = this.hand(), p = this.stage.ptr, dx = p.x - h.x, dy = p.y - h.y, d = Math.hypot(dx, dy);
+      if (d > this.grab.len * REACH) { const f = (d - this.grab.len * REACH) * 26; this.puppet.M.vx += dx / d * f * dt; this.puppet.M.vy += dy / d * f * dt; }   // he's heavy to tug
     }
     this.draw();
     this.sounds();
@@ -281,8 +287,14 @@ export class Chain {
   }
 
   drop() {
-    if (this.grab.i > 0) this.IM[this.grab.i] = this.IM0[this.grab.i];
+    if (this.grab.i < 0) return;
+    this.IM[this.grab.i] = this.IM0[this.grab.i];
     this.grab.i = -1;
+    const { X, Y, PX, PY } = this, max = LET_GO_SPEED * this.S * DT;
+    for (let i = 1; i < this.count; i++) {
+      const vx = X[i] - PX[i], vy = Y[i] - PY[i], v = Math.hypot(vx, vy);
+      if (v > max) { PX[i] = X[i] - vx * max / v; PY[i] = Y[i] - vy * max / v; }
+    }
   }
 
   remove() {

@@ -81,16 +81,18 @@ export async function warning(ctx) {
   } finally {
     title.remove();
   }
-  if (ctx.settings.fling) {   // development: whirl a link round his hand, then let go
-    const ptr = stage.ptr, hand = chain.hand();
-    chain.take(12);
+  if (ctx.settings.fling) {   // development: whirl a link round his hand, or pull one far out past its reach; then let go
+    const ptr = stage.ptr, hand = chain.hand(), stretch = ctx.settings.fling === "stretch";
+    chain.take(stretch ? 26 : 12);
     const start = performance.now();
     const off = stage.add(() => {
       const k = (performance.now() - start) / 1000;
-      ptr.x = hand.x + Math.cos(k * 9) * h * 0.55; ptr.y = hand.y + Math.sin(k * 9) * h * 0.55;
+      if (stretch) { const e = Math.min(1, k / 1.2); ptr.x = hand.x - e * h * 3.2; ptr.y = hand.y - e * h * 1.1; }
+      else { ptr.x = hand.x + Math.cos(k * 9) * h * 0.55; ptr.y = hand.y + Math.sin(k * 9) * h * 0.55; }
     });
     await wait(2500, signal);
     off(); chain.drop();
+    ctx.carol.log(`fling: let go (${ctx.settings.fling})`);
   }
 
   const lines = night.marlware.opening;
