@@ -2,18 +2,19 @@
 // the Past's words surface like memories, the Present's pop and shake, files type in code. Your own lines rise in
 // quickly, word by word, faster than any spirit's, since they're already in your head; when you're afraid they come
 // haltingly, with uneven gaps, and every letter trembles.
-// A tap (or Space) completes a line; the next tap moves on. Lines also move on by themselves.
+// A tap (or Space) completes a line; the next tap moves on. A spirit's line waits for you, with a small ▼ at the end of
+// the card once it's all there; your own thoughts move on by themselves.
 
 import { clamp, el, esc, until, wait } from "./util.js";
 
 const GLYPHS = "#%&@$*/";
 const VOICES = {
-  marl: { who: "Jacob Marlware", mode: "type", cps: 24 },
-  past: { who: "The Ghost of Downloads Past", mode: "words", wps: 3.2 },
-  present: { who: "The Ghost of Filesystems Present", mode: "words", wps: 4.6 },
+  marl: { who: "Jacob Marlware", mode: "type", cps: 24, waits: true },
+  past: { who: "The Ghost of Downloads Past", mode: "words", wps: 3.2, waits: true },
+  present: { who: "The Ghost of Filesystems Present", mode: "words", wps: 4.6, waits: true },
   you: { who: "", mode: "rise", quote: true, at: "lowerLeft" },   // your own lines: large, in quotes, from where you sit
-  narrator: { who: "", mode: "fade" },
-  tiny: { who: "Tiny.tmp", mode: "type", cps: 16, plain: true }
+  narrator: { who: "", mode: "fade", waits: true },
+  tiny: { who: "Tiny.tmp", mode: "type", cps: 16, plain: true, waits: true }
 };
 
 export const holdFor = (text) => 2400 + (text.length / 45) * 1000;
@@ -59,17 +60,18 @@ export class Dialogue {
    * @param {string} text
    * @param {object} o  { voice, who, puppet, at: "head" | "top" | "bottom" | "centre", hold (ms), signal, linger }
    */
-  async say(text, { voice = "marl", who, puppet = null, at, hold, signal, linger = false, afraid = false } = {}) {
+  async say(text, { voice = "marl", who, puppet = null, at, hold, signal, linger = false, afraid = false, waits } = {}) {
     if (!text) return;
     const v = VOICES[voice] || VOICES.marl;
     if (v.quote) text = `\u201C${text}\u201D`;
     const card = this.card;
-    card.className = `card v-${voice}${afraid ? " afraid" : ""}`;
+    card.className = `card v-${voice}${afraid ? " afraid" : ""}${(waits ?? v.waits) ? " waits" : ""}`;
     const label = who ?? v.who;
     const words = v.mode === "words" ? text.split(/(\s+)/).filter(Boolean) : null;
     card.innerHTML = (label ? `<span class="who">${esc(label)}</span>` : "") +
       (words ? `<span class="txt">${words.map((w) => `<span class="w">${esc(w)}</span>`).join("")}</span>`
-        : `<span class="txt"><span class="typed"></span><span class="rest">${esc(text)}</span></span>`);   // the untyped rest keeps the card its final size
+        : `<span class="txt"><span class="typed"></span><span class="rest">${esc(text)}</span></span>`) +   // the untyped rest keeps the card its final size
+      `<span class="next" aria-hidden="true"></span>`;
     const txt = card.querySelector(v.mode === "type" ? ".typed" : ".txt");
     const rest = card.querySelector(".rest");
     if (v.mode === "fade") { rest.textContent = ""; txt.textContent = text; }
@@ -97,7 +99,7 @@ export class Dialogue {
         return now;
       });
     }
-    this.line = { text, v, voice, puppet, at: at || v.at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: risen || (words ? [...txt.querySelectorAll(".w")] : null), times, elapsed: 0, resolve: null };
+    this.line = { text, v, voice, puppet, at: at || v.at || (puppet ? "head" : "bottom"), n: 0, done: v.mode === "fade", heldMs: 0, hold: hold ?? holdFor(text), txt, rest, words: risen || (words ? [...txt.querySelectorAll(".w")] : null), times, elapsed: 0, waits: waits ?? !!v.waits, resolve: null };
     requestAnimationFrame(() => card.classList.add("on"));
     this.place();
     try {
@@ -150,7 +152,7 @@ export class Dialogue {
 
   /** A spirit's line, then your replies to it. The line stays up while you choose. */
   async ask(text, options, o = {}) {
-    const said = this.say(text, { ...o, linger: true, hold: Infinity });
+    const said = this.say(text, { ...o, linger: true, hold: Infinity, waits: false });   // your replies are the prompt
     said.catch(() => {});
     await this.typed(o.signal);
     await wait(this.line?.v.mode === "words" ? 1100 : 600, o.signal);   // let the last words surface, and be read
@@ -223,8 +225,11 @@ export class Dialogue {
         if (n >= L.words.length) this.finish();
       }
     } else if (!this.frozen) {
-      L.heldMs += dt * 1000;
-      if (L.heldMs >= L.hold) this.advance();
+      if (L.waits && !this.autoplay) this.card.classList.add("ready");   // it waits for you: ▼
+      else {
+        L.heldMs += dt * 1000;
+        if (L.heldMs >= L.hold) this.advance();
+      }
     }
     const P = L.puppet;
     if (P) {

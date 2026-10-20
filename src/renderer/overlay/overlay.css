@@ -20,6 +20,13 @@ body.visit #stage canvas { cursor: default; }
 .card { position: absolute; left: 0; top: 0; max-width: min(84vw, 420px); background: rgba(8, 7, 14, .86); border: 1px solid var(--rule);
   border-radius: 10px; padding: 11px 15px 12px; opacity: 0; transition: opacity .35s; box-shadow: 0 10px 40px rgba(0, 0, 0, .45); }
 .card.on { opacity: 1; }
+/* a spirit's line waits for you: a small bobbing ▼ at the end of the card, in the speaker's colour */
+.card.waits { padding-right: 30px; }
+.card .next { position: absolute; right: 11px; bottom: 10px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent;
+  border-top: 8px solid var(--next, #e9e6f5); opacity: 0; transition: opacity .25s; filter: drop-shadow(0 0 4px var(--next, #e9e6f5)); }
+.card.waits.ready .next { opacity: 1; animation: nudge 1.1s ease-in-out infinite; }
+@keyframes nudge { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+.v-marl { --next: var(--marl); } .v-past { --next: var(--past); } .v-present { --next: var(--present); } .v-narrator, .v-tiny { --next: #fff1d6; }
 .card .who { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; margin-block-end: 4px; font-style: normal; font-weight: 400; }
 .card .w { display: inline-block; white-space: pre; }
 .card .rest { visibility: hidden; }
@@ -172,4 +179,5 @@ button:focus-visible { outline: 2px solid var(--accent, var(--marl)); outline-of
   .shake { animation: none; }
   .card.v-you.afraid .l { animation: none; }
   .card.v-you .w { transition: none; filter: none; transform: none; }
+  .card.waits.ready .next { animation: none; }
 }
